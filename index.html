@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clôture de caisse</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -362,13 +363,12 @@
   <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
   <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
   <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
-  
 </div>
 
 <script>
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbze2a4rIwCIJ73-s70nickFAZUZBIx1lAn2RMnB9Ow-eWvP70uNFIO-8N-5No8Ieyg96Q/exec';
+  var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbze2a4rIwCIJ73-s70nickFAZUZBIx1lAn2RMnB9Ow-eWvP70uNFIO-8N-5No8Ieyg96Q/exec';
+  var STORAGE_KEY = 'rosario_ouverture';
 
-  // Date du jour
   var today = new Date();
   var yy = today.getFullYear();
   var mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -378,51 +378,41 @@
   var ds = today.toLocaleDateString('fr-FR', opts);
   document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
   document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
-  var yy = today.getFullYear(), mm = String(today.getMonth()+1).padStart(2,'0'), dd = String(today.getDate()).padStart(2,'0');
-  var dateInput = document.getElementById('f-date'); if(dateInput) dateInput.value = yy+'-'+mm+'-'+dd;
 
-  // Lire un champ numérique
   function n(id) {
     var v = parseFloat(document.getElementById(id).value);
     return isNaN(v) ? 0 : v;
   }
 
-  // Formatter un montant
   function fmt(v) {
-    return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' \u20ac';
+    return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   }
 
-  // Calculs
   function calculate() {
-    var fondOuv  = n('f-fond-ouv');
-    var thEsp    = n('f-th-esp');
-    var thCb     = n('f-th-cb');
-    var thQr     = n('f-th-qr');
-    var reel     = n('f-reel');
+    var fondOuv   = n('f-fond-ouv');
+    var thEsp     = n('f-th-esp');
+    var thCb      = n('f-th-cb');
+    var thQr      = n('f-th-qr');
+    var reel      = n('f-reel');
     var sorties   = n('f-sorties');
     var depannage = n('f-depannage');
 
-    var fo = fondOuv !== null ? fondOuv : 0;
-    var te = thEsp  !== null ? thEsp  : 0;
-    var so = sorties  !== null ? sorties  : 0;
-    var de = depannage !== null ? depannage : 0;
-
-    var totalTh    = te + (thCb||0) + (thQr||0);
-    var fondTh     = fo + te;
-    var nouveauFond = fondOuv !== null ? fo + te - so - de : null;
-    var ecart      = (nouveauFond !== null && reel !== null) ? Math.round((reel - nouveauFond) * 100) / 100 : null;
+    var totalTh     = thEsp + thCb + thQr;
+    var fondTh      = fondOuv + thEsp;
+    var nouveauFond = fondOuv + thEsp - sorties - depannage;
+    var ecart       = reel - nouveauFond;
 
     document.getElementById('out-total-th').textContent = fmt(totalTh);
-    document.getElementById('out-fond-th').textContent  = fondOuv !== null ? fmt(fondTh) : '— €';
+    document.getElementById('out-fond-th').textContent  = fmt(fondTh);
 
     var nfEl = document.getElementById('out-nouveau-fond');
-    nfEl.value = nouveauFond !== null ? nouveauFond.toFixed(2) : '';
+    nfEl.value = document.getElementById('f-fond-ouv').value !== '' ? nouveauFond.toFixed(2) : '';
 
     var ecartEl  = document.getElementById('out-ecart');
     var alertOk  = document.getElementById('alert-ok');
     var alertErr = document.getElementById('alert-err');
 
-    if (ecart !== null) {
+    if (document.getElementById('f-reel').value !== '' && document.getElementById('f-fond-ouv').value !== '') {
       ecartEl.textContent = (ecart >= 0 ? '+' : '') + fmt(ecart);
       if (ecart < 0) {
         ecartEl.className = 'ecart-value ecart-err';
@@ -442,49 +432,37 @@
       }
     } else {
       ecartEl.textContent = '—';
-      ecartEl.className = 'ecart-value';
+      ecartEl.className   = 'ecart-value';
       alertOk.style.display  = 'none';
       alertErr.style.display = 'none';
     }
   }
 
-  // Écouter les champs
   var ids = ['f-fond-ouv','f-th-esp','f-th-cb','f-th-qr','f-reel','f-sorties','f-depannage'];
   for (var i = 0; i < ids.length; i++) {
     document.getElementById(ids[i]).addEventListener('input', calculate);
   }
 
-  // Envoi
   function submitForm() {
     var btn = document.getElementById('btn-submit');
     btn.textContent = 'Envoi en cours…';
     btn.disabled = true;
-
-    var fondOuv  = n('f-fond-ouv');
-    var thEsp    = n('f-th-esp');
-    var thCb     = n('f-th-cb');
-    var thQr     = n('f-th-qr');
-    var reel     = n('f-reel');
-    var sorties  = n('f-sorties');
-
     var params = [
       'action=submit',
-      'date='          + encodeURIComponent(document.getElementById('f-date').value),
-      'responsable='   + encodeURIComponent(document.getElementById('f-responsable').value),
-      'service='       + encodeURIComponent(document.getElementById('f-service').value),
-      'fond_ouverture='+ fondOuv,
-      'th_especes='    + thEsp,
-      'th_cb='         + thCb,
-      'th_qr='         + thQr,
-      'reel_especes='  + reel,
-      'sorties='       + sorties,
-      'depannage='     + (parseFloat(document.getElementById('f-depannage').value)||0),
-      'notes='         + encodeURIComponent(document.getElementById('f-notes').value)
+      'date='           + encodeURIComponent(document.getElementById('f-date').value),
+      'responsable='    + encodeURIComponent(document.getElementById('f-responsable').value),
+      'service='        + encodeURIComponent(document.getElementById('f-service').value),
+      'fond_ouverture=' + n('f-fond-ouv'),
+      'th_especes='     + n('f-th-esp'),
+      'th_cb='          + n('f-th-cb'),
+      'th_qr='          + n('f-th-qr'),
+      'reel_especes='   + n('f-reel'),
+      'sorties='        + n('f-sorties'),
+      'depannage='      + n('f-depannage'),
+      'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value) || 0),
+      'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
-
-    // Afficher la confirmation immédiatement
     showSuccess();
-    // Envoyer les données en arrière-plan
     try {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', SCRIPT_URL + '?' + params, true);
@@ -495,28 +473,14 @@
   function showSuccess() {
     localStorage.removeItem(STORAGE_KEY);
     var now = new Date();
-    var ts = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    var ts  = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
-    var toHide = ['bloc-ouverture','bloc-cloture','submit-final'];
-    toHide.forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
-    var h = document.querySelector('.header'); if(h) h.style.display='none';
+    ['bloc-ouverture','bloc-cloture','submit-final'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    var h = document.querySelector('.header'); if (h) h.style.display = 'none';
     document.getElementById('success').style.display = 'block';
   }
-
-  );
-    document.getElementById('out-nouveau-fond').value = '';
-    document.getElementById('out-total-th').textContent  = '— €';
-    document.getElementById('out-fond-th').textContent   = '— €';
-    document.getElementById('out-ecart').textContent     = '—';
-    document.getElementById('out-ecart').className       = 'ecart-value';
-    document.getElementById('alert-ok').style.display    = 'none';
-    document.getElementById('alert-err').style.display   = 'none';
-    var btn = document.getElementById('btn-submit');
-    btn.textContent = 'Envoyer →'; btn.disabled = false;
-  }
-
-  // ── Ouverture / localStorage ──
-  var STORAGE_KEY = 'rosario_ouverture';
 
   function validerOuverture() {
     var date    = document.getElementById('f-date').value;
@@ -527,24 +491,20 @@
       alert("Veuillez remplir toutes les informations d'ouverture avant de valider.");
       return;
     }
-    // Sauvegarder
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: date, responsable: resp, service: service, fond_ouv: fond }));
-    // Griser et verrouiller les sections 1 et 2
     verrouillerOuverture();
-    // Afficher la suite
-    document.getElementById('bloc-cloture').style.display = 'block';
-    document.getElementById('submit-final').style.display = 'block';
+    document.getElementById('bloc-cloture').style.display    = 'block';
+    document.getElementById('submit-final').style.display    = 'block';
     document.getElementById('btn-valider-ouv').style.display = 'none';
   }
 
   function verrouillerOuverture() {
     var bloc = document.getElementById('bloc-ouverture');
-    bloc.style.opacity = '0.45';
+    bloc.style.opacity       = '0.45';
     bloc.style.pointerEvents = 'none';
-    bloc.style.userSelect = 'none';
+    bloc.style.userSelect    = 'none';
   }
 
-  // Au chargement : restaurer si données sauvegardées
   (function() {
     var saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
@@ -556,9 +516,9 @@
       document.getElementById('f-fond-ouv').value    = d.fond_ouv    || '';
       calculate();
       verrouillerOuverture();
-      document.getElementById('btn-valider-ouv').style.display = 'none';
-      document.getElementById('bloc-cloture').style.display = 'block';
-      document.getElementById('submit-final').style.display = 'block';
+      document.getElementById('btn-valider-ouv').style.display  = 'none';
+      document.getElementById('bloc-cloture').style.display     = 'block';
+      document.getElementById('submit-final').style.display     = 'block';
     } catch(e) { localStorage.removeItem(STORAGE_KEY); }
   })();
 
