@@ -479,13 +479,12 @@
       'notes='         + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
 
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', SCRIPT_URL + '?' + params, true);
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4) { showSuccess(); }
-    };
-    xhr.onerror = function() { showSuccess(); };
-    xhr.send();
+    showSuccess();
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', SCRIPT_URL + '?' + params, true);
+      xhr.send();
+    } catch(e) {}
   }
 
   function showSuccess() {
@@ -493,8 +492,9 @@
     var now = new Date();
     var ts = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
-    document.querySelector('.header').style.display = 'none';
-    document.querySelector('.main').style.display   = 'none';
+    var els = ['bloc-ouverture','bloc-cloture','submit-final'];
+    els.forEach(function(id){ var el = document.getElementById(id); if(el) el.style.display='none'; });
+    var h = document.querySelector('.header'); if(h) h.style.display='none';
     document.getElementById('success').style.display = 'block';
   }
 
