@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clôture de caisse</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -367,7 +366,7 @@
 </div>
 
 <script>
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzuUPL3zqjPci3lbTDGemnEwaYuyVD_PMX0dYometiH7-X3ERrSUBvw57A0fYwK6EUI9Q/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMWGEX3NQSWSm9I68YkaC9CIIEvf91lhx9MDAgjXgRkat69LvR83hVz1QPhwAMytGASw/exec';
 
   // Date du jour
   var today = new Date();
@@ -478,17 +477,17 @@
       'reel_especes='  + reel,
       'sorties='       + sorties,
       'depannage='     + (parseFloat(document.getElementById('f-depannage').value)||0),
-      'nouveau_fond='  + (parseFloat(document.getElementById('out-nouveau-fond') ? document.getElementById('out-nouveau-fond').value : 0)||0),
       'notes='         + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
 
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', SCRIPT_URL + '?' + params, true);
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4) { showSuccess(); }
-    };
-    xhr.onerror = function() { showSuccess(); };
-    xhr.send();
+    // Afficher la confirmation immédiatement
+    showSuccess();
+    // Envoyer les données en arrière-plan
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', SCRIPT_URL + '?' + params, true);
+      xhr.send();
+    } catch(e) {}
   }
 
   function showSuccess() {
@@ -496,8 +495,9 @@
     var now = new Date();
     var ts = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
-    document.querySelector('.header').style.display = 'none';
-    document.querySelector('.main').style.display   = 'none';
+    var toHide = ['bloc-ouverture','bloc-cloture','submit-final'];
+    toHide.forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+    var h = document.querySelector('.header'); if(h) h.style.display='none';
     document.getElementById('success').style.display = 'block';
   }
 
