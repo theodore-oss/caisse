@@ -378,6 +378,8 @@
   var ds = today.toLocaleDateString('fr-FR', opts);
   document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
   document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+  var yy = today.getFullYear(), mm = String(today.getMonth()+1).padStart(2,'0'), dd = String(today.getDate()).padStart(2,'0');
+  var dateInput = document.getElementById('f-date'); if(dateInput) dateInput.value = yy+'-'+mm+'-'+dd;
 
   // Lire un champ numérique
   function n(id) {
