@@ -362,7 +362,7 @@
   <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
   <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
   <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
-  <button onclick="retourFormulaire()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
+  
 </div>
 
 <script>
@@ -501,13 +501,7 @@
     document.getElementById('success').style.display = 'block';
   }
 
-  function retourFormulaire() {
-    document.getElementById('success').style.display = 'none';
-    document.querySelector('.header').style.display  = 'flex';
-    document.querySelector('.main').style.display    = 'block';
-    ['f-th-esp','f-th-cb','f-th-qr','f-reel','f-sorties','f-depannage','f-notes'].forEach(function(id) {
-      document.getElementById(id).value = '';
-    });
+  );
     document.getElementById('out-nouveau-fond').value = '';
     document.getElementById('out-total-th').textContent  = '— €';
     document.getElementById('out-fond-th').textContent   = '— €';
