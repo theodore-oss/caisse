@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHRleHQgeT0iMjgiIGZvbnQtc2l6ZT0iMjgiPvCfkrI8L3RleHQ+PC9zdmc+">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clôture de caisse</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -477,6 +478,7 @@
       'reel_especes='  + reel,
       'sorties='       + sorties,
       'depannage='     + (parseFloat(document.getElementById('f-depannage').value)||0),
+      'nouveau_fond='  + (parseFloat(document.getElementById('out-nouveau-fond') ? document.getElementById('out-nouveau-fond').value : 0)||0),
       'notes='         + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
 
