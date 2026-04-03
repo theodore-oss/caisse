@@ -197,6 +197,7 @@
             <option value="">— Sélectionner —</option>
             <option>Déjeuner</option>
             <option>Dîner</option>
+            <option>Déjeuner + Dîner</option>
           </select>
         </div>
       </div>
@@ -353,36 +354,14 @@
 
 </div>
 
-<div id="success" style="max-width:720px;margin:0 auto;padding:40px 24px 80px;display:none;">
-  <div style="display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #e4e1d9;">
-    <div style="width:48px;height:48px;background:#f5e8e8;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8B1A1A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-    </div>
-    <div>
-      <h2 style="font-size:20px;font-weight:600;margin-bottom:3px;">Clôture enregistrée</h2>
-      <p style="font-size:13px;color:#8a8680;font-weight:300;">Les données ont été envoyées vers le Google Sheet.</p>
-    </div>
+<div id="success" style="max-width:720px;margin:0 auto;padding:80px 24px;display:none;text-align:center;">
+  <div style="width:56px;height:56px;background:#f5e8e8;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B1A1A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
   </div>
-  <div style="background:#fff;border:1px solid #e4e1d9;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:20px;">
-    <div style="background:#fafaf8;border-bottom:1px solid #e4e1d9;padding:14px 20px;">
-      <span style="font-size:12px;font-weight:600;color:#1a1916;">Récapitulatif du service</span>
-    </div>
-    <div style="padding:0 20px;">
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Service</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-service">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Date</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-date">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Responsable</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-responsable">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Ventes espèces</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-esp">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Ventes CB</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-cb">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Ventes QR code</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-qr">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Total théorique</span><span style="font-size:15px;font-weight:600;color:#8B1A1A;" id="recap-total">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Caisse comptée</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-reel">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Écart</span><span style="font-size:13px;font-weight:600;" id="recap-ecart">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Espèces au coffre</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-sorties">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede6;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Dépense de dépannage</span><span style="font-size:13px;font-weight:600;color:#1a1916;" id="recap-depannage">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;"><span style="font-size:12px;color:#8a8680;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">Nouveau fonds de caisse</span><span style="font-size:15px;font-weight:600;color:#8B1A1A;" id="recap-nouveau-fond">—</span></div>
-    </div>
-  </div>
-  <button onclick="retourFormulaire()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;width:100%;transition:background 0.15s;">← Effectuer une nouvelle clôture</button>
+  <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
+  <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
+  <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
+  <button onclick="retourFormulaire()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
 </div>
 
 <script>
@@ -511,33 +490,9 @@
 
   function showSuccess() {
     localStorage.removeItem(STORAGE_KEY);
-    var thEsp = parseFloat(document.getElementById('f-th-esp').value)||0;
-    var thCb  = parseFloat(document.getElementById('f-th-cb').value)||0;
-    var thQr  = parseFloat(document.getElementById('f-th-qr').value)||0;
-    var reel  = parseFloat(document.getElementById('f-reel').value)||0;
-    var fond  = parseFloat(document.getElementById('f-fond-ouv').value)||0;
-    var sort  = parseFloat(document.getElementById('f-sorties').value)||0;
-    var dep   = parseFloat(document.getElementById('f-depannage').value)||0;
-    var fondTh = fond + thEsp;
-    var ecart  = Math.round((reel - nf)*100)/100;
-    var nf     = fond + thEsp - sort - dep;
-    var rawDate = document.getElementById('f-date').value;
-    var dp = rawDate ? rawDate.split('-') : [];
-    var dateLabel = dp.length===3 ? dp[2]+'/'+dp[1]+'/'+dp[0] : rawDate;
-    document.getElementById('recap-service').textContent     = document.getElementById('f-service').value||'—';
-    document.getElementById('recap-date').textContent        = dateLabel||'—';
-    document.getElementById('recap-responsable').textContent = document.getElementById('f-responsable').value||'—';
-    document.getElementById('recap-esp').textContent         = thEsp.toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-cb').textContent          = thCb.toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-qr').textContent          = thQr.toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-total').textContent       = (thEsp+thCb+thQr).toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-reel').textContent        = reel.toFixed(2).replace('.',',')+' €';
-    var ecartEl = document.getElementById('recap-ecart');
-    ecartEl.textContent = (ecart>=0?'+':'')+ecart.toFixed(2).replace('.',',')+' €';
-    ecartEl.style.color = ecart<0?'#c0392b':'#27ae60';
-    document.getElementById('recap-sorties').textContent     = sort.toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-depannage').textContent   = dep.toFixed(2).replace('.',',')+' €';
-    document.getElementById('recap-nouveau-fond').textContent= nf.toFixed(2).replace('.',',')+' €';
+    var now = new Date();
+    var ts = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
     document.querySelector('.header').style.display = 'none';
     document.querySelector('.main').style.display   = 'none';
     document.getElementById('success').style.display = 'block';
