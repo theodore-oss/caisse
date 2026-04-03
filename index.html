@@ -268,38 +268,10 @@
     </div>
   </div>
 
-  <!-- 4. CAISSE COMPTÉE -->
+  <!-- 4. RÉPARTITION -->
   <div class="card">
     <div class="card-header">
       <div class="card-num">4</div>
-      <span class="card-title">Caisse comptée physiquement</span>
-      <span class="card-badge badge-close">À la clôture</span>
-    </div>
-    <div class="card-body">
-      <div class="field">
-        <label>Espèces comptées (€)</label>
-        <input type="number" id="f-reel" placeholder="0.00" step="0.01" min="0">
-        <span class="field-hint">Comptez les espèces présentes en caisse en fin de service.</span>
-      </div>
-      <div class="ecart-block">
-        <span class="ecart-label">Écart de caisse espèces</span>
-        <span class="ecart-value" id="out-ecart">—</span>
-      </div>
-      <div class="alert-box alert-ok" id="alert-ok">
-        <div class="alert-title">Caisse équilibrée</div>
-        <div class="alert-sub" id="alert-ok-sub">Aucun écart détecté.</div>
-      </div>
-      <div class="alert-box alert-err" id="alert-err">
-        <div class="alert-title" id="alert-err-title">Écart négatif détecté</div>
-        <div class="alert-sub">Vérifiez le comptage avant de valider.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5. RÉPARTITION -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-num">5</div>
       <span class="card-title">Clôture de caisse</span>
       <span class="card-badge badge-close">À la clôture</span>
     </div>
@@ -322,6 +294,34 @@
           <input type="number" id="out-nouveau-fond" class="computed" readonly tabindex="-1" placeholder="—">
           
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. CAISSE COMPTÉE -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-num">5</div>
+      <span class="card-title">Caisse comptée physiquement</span>
+      <span class="card-badge badge-close">À la clôture</span>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>Espèces comptées (€)</label>
+        <input type="number" id="f-reel" placeholder="0.00" step="0.01" min="0">
+        <span class="field-hint">Comptez les espèces présentes en caisse en fin de service.</span>
+      </div>
+      <div class="ecart-block">
+        <span class="ecart-label">Écart de caisse espèces</span>
+        <span class="ecart-value" id="out-ecart">—</span>
+      </div>
+      <div class="alert-box alert-ok" id="alert-ok">
+        <div class="alert-title">Caisse équilibrée</div>
+        <div class="alert-sub" id="alert-ok-sub">Aucun écart détecté.</div>
+      </div>
+      <div class="alert-box alert-err" id="alert-err">
+        <div class="alert-title" id="alert-err-title">Écart négatif détecté</div>
+        <div class="alert-sub">Vérifiez le comptage avant de valider.</div>
       </div>
     </div>
   </div>
@@ -420,22 +420,27 @@
     var sorties   = n('f-sorties');
     var depannage = n('f-depannage');
 
-    var totalTh    = thEsp + thCb + thQr;
-    var fondTh     = fondOuv + thEsp;
-    var ecart      = Math.round((reel - fondTh) * 100) / 100;
-    var nouveauFond = reel - sorties - depannage;
+    var fo = fondOuv !== null ? fondOuv : 0;
+    var te = thEsp  !== null ? thEsp  : 0;
+    var so = sorties  !== null ? sorties  : 0;
+    var de = depannage !== null ? depannage : 0;
+
+    var totalTh    = te + (thCb||0) + (thQr||0);
+    var fondTh     = fo + te;
+    var nouveauFond = fondOuv !== null ? fo + te - so - de : null;
+    var ecart      = (nouveauFond !== null && reel !== null) ? Math.round((reel - nouveauFond) * 100) / 100 : null;
 
     document.getElementById('out-total-th').textContent = fmt(totalTh);
-    document.getElementById('out-fond-th').textContent  = fmt(fondTh);
+    document.getElementById('out-fond-th').textContent  = fondOuv !== null ? fmt(fondTh) : '— €';
 
     var nfEl = document.getElementById('out-nouveau-fond');
-    nfEl.value = document.getElementById('f-reel').value !== '' ? nouveauFond.toFixed(2) : '';
+    nfEl.value = nouveauFond !== null ? nouveauFond.toFixed(2) : '';
 
     var ecartEl  = document.getElementById('out-ecart');
     var alertOk  = document.getElementById('alert-ok');
     var alertErr = document.getElementById('alert-err');
 
-    if (document.getElementById('f-reel').value !== '') {
+    if (ecart !== null) {
       ecartEl.textContent = (ecart >= 0 ? '+' : '') + fmt(ecart);
       if (ecart < 0) {
         ecartEl.className = 'ecart-value ecart-err';
@@ -514,8 +519,8 @@
     var sort  = parseFloat(document.getElementById('f-sorties').value)||0;
     var dep   = parseFloat(document.getElementById('f-depannage').value)||0;
     var fondTh = fond + thEsp;
-    var ecart  = Math.round((reel - fondTh)*100)/100;
-    var nf     = reel - sort - dep;
+    var ecart  = Math.round((reel - nf)*100)/100;
+    var nf     = fond + thEsp - sort - dep;
     var rawDate = document.getElementById('f-date').value;
     var dp = rawDate ? rawDate.split('-') : [];
     var dateLabel = dp.length===3 ? dp[2]+'/'+dp[1]+'/'+dp[0] : rawDate;
