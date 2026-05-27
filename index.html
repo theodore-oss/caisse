@@ -218,6 +218,7 @@
         <label>Montant compté (€)</label>
         <input type="number" id="f-fond-ouv" placeholder="0.00" step="0.01" min="0">
         <span class="field-hint">Comptez les espèces présentes en caisse avant le début du service.</span>
+        <span class="field-hint" id="hint-veille" style="color:#8B1A1A;font-style:italic;"></span>
       </div>
     </div>
   </div>
@@ -226,10 +227,10 @@
   <div id="btn-valider-ouv">
     <div class="submit-card">
       <div class="submit-info">
-        <strong>Valider l'ouverture</strong><br>
-        Les sections 1 et 2 seront verrouillées et sauvegardées.
+        <strong>Sauvegarder l'ouverture</strong><br>
+        Les données seront mémorisées jusqu'à la clôture du service.
       </div>
-      <button type="button" class="submit-btn" onclick="validerOuverture()">Valider l'ouverture →</button>
+      <button type="button" class="submit-btn" onclick="validerOuverture()">Sauvegarder l'ouverture →</button>
     </div>
   </div>
 
@@ -363,12 +364,14 @@
   <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
   <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
   <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
+  <button onclick="retourFormulaire()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
 </div>
 
 <script>
   var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbze2a4rIwCIJ73-s70nickFAZUZBIx1lAn2RMnB9Ow-eWvP70uNFIO-8N-5No8Ieyg96Q/exec';
   var STORAGE_KEY = 'rosario_ouverture';
 
+  // Date du jour
   var today = new Date();
   var yy = today.getFullYear();
   var mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -378,6 +381,18 @@
   var ds = today.toLocaleDateString('fr-FR', opts);
   document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
   document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+
+  // Chercher le dernier fonds de caisse via JSONP
+  function onFondVeille(data) {
+    if (data && data.status === 'ok' && data.fond !== null && data.fond !== '') {
+      var montant = parseFloat(data.fond).toFixed(2).replace('.', ',');
+      var hint = document.getElementById('hint-veille');
+      if (hint) hint.textContent = 'Dernier fonds enregistré : ' + montant + ' €';
+    }
+  }
+  var s = document.createElement('script');
+  s.src = SCRIPT_URL + '?callback=onFondVeille';
+  document.head.appendChild(s);
 
   function n(id) {
     var v = parseFloat(document.getElementById(id).value);
@@ -482,29 +497,24 @@
     document.getElementById('success').style.display = 'block';
   }
 
+  // Sauvegarder l'ouverture sans griser ni masquer
   function validerOuverture() {
     var date    = document.getElementById('f-date').value;
     var resp    = document.getElementById('f-responsable').value;
     var service = document.getElementById('f-service').value;
     var fond    = document.getElementById('f-fond-ouv').value;
     if (!date || !resp || !service || !fond) {
-      alert("Veuillez remplir toutes les informations d'ouverture avant de valider.");
+      alert("Veuillez remplir toutes les informations d'ouverture avant de sauvegarder.");
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: date, responsable: resp, service: service, fond_ouv: fond }));
-    verrouillerOuverture();
+    // Afficher les sections de clôture sans griser l'ouverture
     document.getElementById('bloc-cloture').style.display    = 'block';
     document.getElementById('submit-final').style.display    = 'block';
     document.getElementById('btn-valider-ouv').style.display = 'none';
   }
 
-  function verrouillerOuverture() {
-    var bloc = document.getElementById('bloc-ouverture');
-    bloc.style.opacity       = '0.45';
-    bloc.style.pointerEvents = 'none';
-    bloc.style.userSelect    = 'none';
-  }
-
+  // Restaurer les données d'ouverture au chargement
   (function() {
     var saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
@@ -515,7 +525,6 @@
       document.getElementById('f-service').value     = d.service     || '';
       document.getElementById('f-fond-ouv').value    = d.fond_ouv    || '';
       calculate();
-      verrouillerOuverture();
       document.getElementById('btn-valider-ouv').style.display  = 'none';
       document.getElementById('bloc-cloture').style.display     = 'block';
       document.getElementById('submit-final').style.display     = 'block';
