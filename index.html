@@ -158,10 +158,74 @@
     .success-icon svg { width: 24px; height: 24px; stroke: var(--accent); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
     #success h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
     #success p  { font-size: 14px; color: var(--muted); }
+
+    #pin-screen {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .pin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 36px 28px;
+      width: 300px;
+      text-align: center;
+    }
+    .pin-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .pin-sub   { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+    .pin-dots  { display: flex; justify-content: center; gap: 14px; margin-bottom: 24px; }
+    .pin-dot   { width: 13px; height: 13px; border-radius: 50%; background: var(--border); transition: background 0.15s; }
+    .pin-dot.filled { background: var(--accent); }
+    .pin-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .pin-key {
+      font-family: 'Sora', sans-serif;
+      font-size: 20px; font-weight: 500;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 15px; cursor: pointer;
+      transition: background 0.1s, transform 0.08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pin-key:hover  { background: #eeece8; }
+    .pin-key:active { background: var(--accent-l); transform: scale(0.96); }
+    .pin-error    { font-size: 12px; color: var(--danger); margin-top: 14px; min-height: 16px; }
+    .pin-checking { font-size: 12px; color: var(--muted); margin-top: 14px; display: none; }
     @keyframes up { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   </style>
 </head>
 <body>
+
+<div id="pin-screen">
+  <div class="pin-card">
+    <div class="pin-title">Clôture de caisse</div>
+    <div class="pin-sub">Entrez votre code PIN</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-key" onclick="pk('1')">1</button>
+      <button class="pin-key" onclick="pk('2')">2</button>
+      <button class="pin-key" onclick="pk('3')">3</button>
+      <button class="pin-key" onclick="pk('4')">4</button>
+      <button class="pin-key" onclick="pk('5')">5</button>
+      <button class="pin-key" onclick="pk('6')">6</button>
+      <button class="pin-key" onclick="pk('7')">7</button>
+      <button class="pin-key" onclick="pk('8')">8</button>
+      <button class="pin-key" onclick="pk('9')">9</button>
+      <button class="pin-key" onclick="pinClear()" style="color:#c0392b;font-size:18px;">✕</button>
+      <button class="pin-key" onclick="pk('0')">0</button>
+      <button class="pin-key" onclick="pinDel()" style="font-size:20px;">⌫</button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-checking" id="pin-checking">Vérification…</div>
+  </div>
+</div>
 
 <div class="header">
   <div>
@@ -384,52 +448,87 @@
 </div>
 
 <script>
-  var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbzlIwFk8RMvJcFepmC_OPGHASDiuKxenhULMSUN3wyxQEgfZJwqiPmOjdYjQj_vm9xYcg/exec';
-  var STORAGE_KEY = 'rosario_ouverture';
+  var SCRIPT_URL = 'https://script.google.com/a/macros/grupodomingo.io/s/AKfycbwEU23ZMDCspcxqvJ8q46GpBMV0UFjsVahCjZH4nJiRRb2YuEu__0zHR0CX5r1JAYM0EA/exec';
+  var PIN_AUTH   = 'rosario_pin_ok';
 
-  // Date du jour
-  var today = new Date();
-  var yy = today.getFullYear();
-  var mm = String(today.getMonth() + 1).padStart(2, '0');
-  var dd = String(today.getDate()).padStart(2, '0');
-  document.getElementById('f-date').value = yy + '-' + mm + '-' + dd;
-  var opts = { weekday:'long', day:'numeric', month:'long', year:'numeric' };
-  var ds = today.toLocaleDateString('fr-FR', opts);
-  document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
-  document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+  // ── PIN ──
+  var pinVal = '';
+  function pk(d) {
+    if (pinVal.length >= 4) return;
+    pinVal += d;
+    updateDots();
+    if (pinVal.length === 4) setTimeout(checkPin, 120);
+  }
+  function pinDel()   { pinVal = pinVal.slice(0,-1); updateDots(); clearPinMsg(); }
+  function pinClear() { pinVal = ''; updateDots(); clearPinMsg(); }
+  function clearPinMsg() {
+    document.getElementById('pin-error').textContent = '';
+    document.getElementById('pin-checking').style.display = 'none';
+  }
+  function updateDots() {
+    for (var i=0; i<4; i++)
+      document.getElementById('pd'+i).classList.toggle('filled', i < pinVal.length);
+  }
+  function checkPin() {
+    document.getElementById('pin-checking').style.display = 'block';
+    window._onPinCheck = function(data) {
+      document.getElementById('pin-checking').style.display = 'none';
+      if (data && data.ok === true) {
+        sessionStorage.setItem(PIN_AUTH, '1');
+        document.getElementById('pin-screen').style.display = 'none';
+        initApp();
+      } else {
+        document.getElementById('pin-error').textContent = 'Code incorrect, réessayez.';
+        pinVal = ''; updateDots();
+      }
+    };
+    var s = document.createElement('script');
+    s.src = SCRIPT_URL + '?action=check_pin&pin=' + encodeURIComponent(pinVal) + '&callback=_onPinCheck';
+    document.head.appendChild(s);
+  }
+  if (sessionStorage.getItem(PIN_AUTH) === '1') {
+    document.getElementById('pin-screen').style.display = 'none';
+    initApp();
+  }
 
-  // Récupérer les dernières espèces comptées physiquement (col 14) + ouverture en cours
-  window.onFondVeille = function(data) {
-    if (data && data.status === 'ok' && data.fond !== null && data.fond !== '') {
-      var montant = parseFloat(data.fond).toFixed(2).replace('.', ',');
-      var hint = document.getElementById('hint-veille');
-      if (hint) hint.textContent = 'Dernières espèces comptées : ' + montant + ' €';
-    }
-  };
-  window.onOuvertureSheet = function(data) {
-    if (data && data.status === 'ok' && data.ouverture) {
-      var d = data.ouverture;
-      if (d.date) document.getElementById('f-date').value = d.date;
-      if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
-      if (d.service) document.getElementById('f-service').value = d.service;
-      if (d.fond_ouv) document.getElementById('f-fond-ouv').value = d.fond_ouv;
-      calculate();
-      document.getElementById('btn-valider-ouv').style.display = 'none';
-      document.getElementById('bloc-cloture').style.display    = 'block';
-      document.getElementById('submit-final').style.display    = 'block';
-    }
-  };
+  // ── App ──
+  function initApp() {
+    var today = new Date();
+    var yy = today.getFullYear();
+    var mm = String(today.getMonth()+1).padStart(2,'0');
+    var dd = String(today.getDate()).padStart(2,'0');
+    document.getElementById('f-date').value = yy+'-'+mm+'-'+dd;
+    var opts = { weekday:'long', day:'numeric', month:'long', year:'numeric' };
+    var ds = today.toLocaleDateString('fr-FR', opts);
+    document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase()+ds.slice(1);
+    document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
-  // Charger les données au démarrage
-  (function() {
+    window.onFondVeille = function(data) {
+      if (data && data.status === 'ok' && data.fond !== null && data.fond !== '') {
+        var hint = document.getElementById('hint-veille');
+        if (hint) hint.textContent = 'Dernières espèces comptées : ' + parseFloat(data.fond).toFixed(2).replace('.',',') + ' €';
+      }
+    };
+    window.onOuvertureSheet = function(data) {
+      if (data && data.status === 'ok' && data.ouverture) {
+        var d = data.ouverture;
+        if (d.date)        document.getElementById('f-date').value        = d.date;
+        if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
+        if (d.service)     document.getElementById('f-service').value     = d.service;
+        if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
+        calculate();
+        document.getElementById('btn-valider-ouv').style.display = 'none';
+        document.getElementById('bloc-cloture').style.display    = 'block';
+        document.getElementById('submit-final').style.display    = 'block';
+      }
+    };
     var s1 = document.createElement('script');
     s1.src = SCRIPT_URL + '?callback=onFondVeille';
     document.head.appendChild(s1);
-
     var s2 = document.createElement('script');
     s2.src = SCRIPT_URL + '?action=get_ouverture&callback=onOuvertureSheet';
     document.head.appendChild(s2);
-  })();
+  }
 
   function n(id) {
     var el = document.getElementById(id);
@@ -437,9 +536,8 @@
     var v = parseFloat(el.value);
     return isNaN(v) ? 0 : v;
   }
-
   function fmt(v) {
-    return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+    return (Math.round(v*100)/100).toFixed(2).replace('.',',') + ' €';
   }
 
   function calculate() {
@@ -450,57 +548,45 @@
     var reel      = n('f-reel');
     var sorties   = n('f-sorties');
     var depannage = n('f-depannage');
-
     var totalTh     = thEsp + thCb + thQr;
     var fondTh      = fondOuv + thEsp;
     var nouveauFond = fondOuv + thEsp - sorties - depannage;
     var ecart       = reel - nouveauFond;
-
     document.getElementById('out-total-th').textContent = fmt(totalTh);
     document.getElementById('out-fond-th').textContent  = fmt(fondTh);
-
     var nfEl = document.getElementById('out-nouveau-fond');
     nfEl.value = document.getElementById('f-fond-ouv').value !== '' ? nouveauFond.toFixed(2) : '';
-
     var ecartEl  = document.getElementById('out-ecart');
     var alertOk  = document.getElementById('alert-ok');
     var alertErr = document.getElementById('alert-err');
-
     if (document.getElementById('f-reel').value !== '' && document.getElementById('f-fond-ouv').value !== '') {
       ecartEl.textContent = (ecart >= 0 ? '+' : '') + fmt(ecart);
       if (ecart < 0) {
         ecartEl.className = 'ecart-value ecart-err';
-        alertErr.style.display = 'block';
-        alertOk.style.display  = 'none';
+        alertErr.style.display = 'block'; alertOk.style.display = 'none';
         document.getElementById('alert-err-title').textContent = 'Écart négatif : ' + fmt(ecart);
       } else if (ecart > 0) {
         ecartEl.className = 'ecart-value ecart-ok';
-        alertOk.style.display  = 'block';
-        alertErr.style.display = 'none';
+        alertOk.style.display = 'block'; alertErr.style.display = 'none';
         document.getElementById('alert-ok-sub').textContent = 'Excédent de ' + fmt(ecart) + ' en caisse.';
       } else {
         ecartEl.className = 'ecart-value ecart-ok';
-        alertOk.style.display  = 'block';
-        alertErr.style.display = 'none';
+        alertOk.style.display = 'block'; alertErr.style.display = 'none';
         document.getElementById('alert-ok-sub').textContent = 'Caisse parfaitement équilibrée.';
       }
     } else {
-      ecartEl.textContent = '—';
-      ecartEl.className   = 'ecart-value';
-      alertOk.style.display  = 'none';
-      alertErr.style.display = 'none';
+      ecartEl.textContent = '—'; ecartEl.className = 'ecart-value';
+      alertOk.style.display = 'none'; alertErr.style.display = 'none';
     }
   }
 
   var ids = ['f-fond-ouv','f-th-esp','f-th-cb','f-th-qr','f-reel','f-sorties','f-depannage'];
-  for (var i = 0; i < ids.length; i++) {
+  for (var i=0; i<ids.length; i++)
     document.getElementById(ids[i]).addEventListener('input', calculate);
-  }
 
   function submitForm() {
     var btn = document.getElementById('btn-submit');
-    btn.textContent = 'Envoi en cours…';
-    btn.disabled = true;
+    btn.textContent = 'Envoi en cours…'; btn.disabled = true;
     var params = [
       'action=submit',
       'date='           + encodeURIComponent(document.getElementById('f-date').value),
@@ -513,7 +599,7 @@
       'reel_especes='   + n('f-reel'),
       'sorties='        + n('f-sorties'),
       'depannage='      + n('f-depannage'),
-      'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value) || 0),
+      'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value)||0),
       'pourboires='     + n('f-pourboires'),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
@@ -527,7 +613,7 @@
 
   function showSuccess() {
     var now = new Date();
-    var ts  = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    var ts = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
     ['bloc-ouverture','bloc-cloture','submit-final'].forEach(function(id) {
       var el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -545,18 +631,15 @@
       alert("Veuillez remplir toutes les informations d'ouverture avant de sauvegarder.");
       return;
     }
-    // Envoyer sur le Sheet (synchronisation multi-appareils)
     try {
       var xhr = new XMLHttpRequest();
-      var p = 'action=save_ouverture'
-            + '&date='        + encodeURIComponent(date)
+      var p = 'action=save_ouverture&date=' + encodeURIComponent(date)
             + '&responsable=' + encodeURIComponent(resp)
             + '&service='     + encodeURIComponent(service)
             + '&fond_ouv='    + encodeURIComponent(fond);
       xhr.open('GET', SCRIPT_URL + '?' + p, true);
       xhr.send();
     } catch(e) {}
-    // Afficher les sections de clôture
     document.getElementById('bloc-cloture').style.display    = 'block';
     document.getElementById('submit-final').style.display    = 'block';
     document.getElementById('btn-valider-ouv').style.display = 'none';
