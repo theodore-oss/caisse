@@ -448,7 +448,7 @@
 </div>
 
 <script>
-  var SCRIPT_URL = 'https://script.google.com/a/macros/grupodomingo.io/s/AKfycbyQ-cz0AuisD93VAfD1-g8fDP8Uozox5ATpeTEJhze8BSnYJgXnRXH2jyBrsvH_f3w4XQ/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycfjcsmXrGpAES58hUa2KZ78nTNbIL2WGZ_R24YaV1nIas1yGIuQJHeeG2mFzxjHpCjg/exec';
   var PIN_AUTH   = 'rosario_pin_ok';
 
   // ── PIN ──
@@ -503,32 +503,36 @@
     document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase()+ds.slice(1);
     document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
-    // Récupérer espèces comptées via fetch
-    fetch(SCRIPT_URL)
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        if (data && data.fond !== null && data.fond !== '') {
-          var hint = document.getElementById('hint-veille');
-          if (hint) hint.textContent = 'Dernières espèces comptées : ' + parseFloat(data.fond).toFixed(2).replace('.',',') + ' €';
-        }
-      }).catch(function(){});
+    // Récupérer espèces comptées via JSONP
+    window._onFondVeille = function(data) {
+      if (data && data.fond !== null && data.fond !== '') {
+        var hint = document.getElementById('hint-veille');
+        if (hint) hint.textContent = 'Dernières espèces comptées : ' + parseFloat(data.fond).toFixed(2).replace('.',',') + ' €';
+      }
+    };
+    var s1 = document.createElement('script');
+    s1.src = SCRIPT_URL + '?callback=_onFondVeille&t=' + Date.now();
+    s1.onerror = function(){};
+    document.head.appendChild(s1);
 
-    // Récupérer ouverture en cours via fetch
-    fetch(SCRIPT_URL + '?action=get_ouverture')
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        if (data && data.status === 'ok' && data.ouverture) {
-          var d = data.ouverture;
-          if (d.date)        document.getElementById('f-date').value        = d.date;
-          if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
-          if (d.service)     document.getElementById('f-service').value     = d.service;
-          if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
-          calculate();
-          document.getElementById('btn-valider-ouv').style.display = 'none';
-          document.getElementById('bloc-cloture').style.display    = 'block';
-          document.getElementById('submit-final').style.display    = 'block';
-        }
-      }).catch(function(){});
+    // Récupérer ouverture en cours via JSONP
+    window._onOuvertureSheet = function(data) {
+      if (data && data.status === 'ok' && data.ouverture) {
+        var d = data.ouverture;
+        if (d.date)        document.getElementById('f-date').value        = d.date;
+        if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
+        if (d.service)     document.getElementById('f-service').value     = d.service;
+        if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
+        calculate();
+        document.getElementById('btn-valider-ouv').style.display = 'none';
+        document.getElementById('bloc-cloture').style.display    = 'block';
+        document.getElementById('submit-final').style.display    = 'block';
+      }
+    };
+    var s2 = document.createElement('script');
+    s2.src = SCRIPT_URL + '?action=get_ouverture&callback=_onOuvertureSheet&t=' + Date.now();
+    s2.onerror = function(){};
+    document.head.appendChild(s2);
   }
 
   function n(id) {
