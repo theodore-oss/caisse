@@ -227,10 +227,10 @@
   <div id="btn-valider-ouv">
     <div class="submit-card">
       <div class="submit-info">
-        <strong>Sauvegarder l'ouverture</strong><br>
-        Les données seront mémorisées jusqu'à la clôture du service.
+        <strong>Valider l'ouverture</strong><br>
+        Les sections 1 et 2 seront verrouillées et sauvegardées.
       </div>
-      <button type="button" class="submit-btn" onclick="validerOuverture()">Sauvegarder l'ouverture →</button>
+      <button type="button" class="submit-btn" onclick="validerOuverture()">Valider l'ouverture →</button>
     </div>
   </div>
 
@@ -330,10 +330,26 @@
     </div>
   </div>
 
-  <!-- 6. NOTES -->
+  <!-- 6. POURBOIRES -->
   <div class="card">
     <div class="card-header">
       <div class="card-num">6</div>
+      <span class="card-title">Pourboires</span>
+      <span class="card-badge badge-close">À la clôture</span>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>Montant total des pourboires (€)</label>
+        <input type="number" id="f-pourboires" placeholder="0.00" step="0.01" min="0">
+        <span class="field-hint">Pourboires mis au coffre</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. NOTES -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-num">7</div>
       <span class="card-title">Notes</span>
     </div>
     <div class="card-body">
@@ -364,7 +380,7 @@
   <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
   <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
   <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
-  <button onclick="retourFormulaire()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
+  <button onclick="window.location.reload()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
 </div>
 
 <script>
@@ -382,20 +398,43 @@
   document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
   document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
-  // Chercher le dernier fonds de caisse via JSONP
-  function onFondVeille(data) {
+  // Récupérer les dernières espèces comptées physiquement (col 14) + ouverture en cours
+  window.onFondVeille = function(data) {
     if (data && data.status === 'ok' && data.fond !== null && data.fond !== '') {
       var montant = parseFloat(data.fond).toFixed(2).replace('.', ',');
       var hint = document.getElementById('hint-veille');
-      if (hint) hint.textContent = 'Dernier fonds enregistré : ' + montant + ' €';
+      if (hint) hint.textContent = 'Dernières espèces comptées : ' + montant + ' €';
     }
-  }
-  var s = document.createElement('script');
-  s.src = SCRIPT_URL + '?callback=onFondVeille';
-  document.head.appendChild(s);
+  };
+  window.onOuvertureSheet = function(data) {
+    if (data && data.status === 'ok' && data.ouverture) {
+      var d = data.ouverture;
+      if (d.date) document.getElementById('f-date').value = d.date;
+      if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
+      if (d.service) document.getElementById('f-service').value = d.service;
+      if (d.fond_ouv) document.getElementById('f-fond-ouv').value = d.fond_ouv;
+      calculate();
+      document.getElementById('btn-valider-ouv').style.display = 'none';
+      document.getElementById('bloc-cloture').style.display    = 'block';
+      document.getElementById('submit-final').style.display    = 'block';
+    }
+  };
+
+  // Charger les données au démarrage
+  (function() {
+    var s1 = document.createElement('script');
+    s1.src = SCRIPT_URL + '?callback=onFondVeille';
+    document.head.appendChild(s1);
+
+    var s2 = document.createElement('script');
+    s2.src = SCRIPT_URL + '?action=get_ouverture&callback=onOuvertureSheet';
+    document.head.appendChild(s2);
+  })();
 
   function n(id) {
-    var v = parseFloat(document.getElementById(id).value);
+    var el = document.getElementById(id);
+    if (!el) return 0;
+    var v = parseFloat(el.value);
     return isNaN(v) ? 0 : v;
   }
 
@@ -475,6 +514,7 @@
       'sorties='        + n('f-sorties'),
       'depannage='      + n('f-depannage'),
       'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value) || 0),
+      'pourboires='     + n('f-pourboires'),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
     showSuccess();
@@ -486,7 +526,6 @@
   }
 
   function showSuccess() {
-    localStorage.removeItem(STORAGE_KEY);
     var now = new Date();
     var ts  = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
     document.getElementById('success-timestamp').textContent = 'Envoyé le ' + ts;
@@ -497,7 +536,6 @@
     document.getElementById('success').style.display = 'block';
   }
 
-  // Sauvegarder l'ouverture sans griser ni masquer
   function validerOuverture() {
     var date    = document.getElementById('f-date').value;
     var resp    = document.getElementById('f-responsable').value;
@@ -507,29 +545,22 @@
       alert("Veuillez remplir toutes les informations d'ouverture avant de sauvegarder.");
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: date, responsable: resp, service: service, fond_ouv: fond }));
-    // Afficher les sections de clôture sans griser l'ouverture
+    // Envoyer sur le Sheet (synchronisation multi-appareils)
+    try {
+      var xhr = new XMLHttpRequest();
+      var p = 'action=save_ouverture'
+            + '&date='        + encodeURIComponent(date)
+            + '&responsable=' + encodeURIComponent(resp)
+            + '&service='     + encodeURIComponent(service)
+            + '&fond_ouv='    + encodeURIComponent(fond);
+      xhr.open('GET', SCRIPT_URL + '?' + p, true);
+      xhr.send();
+    } catch(e) {}
+    // Afficher les sections de clôture
     document.getElementById('bloc-cloture').style.display    = 'block';
     document.getElementById('submit-final').style.display    = 'block';
     document.getElementById('btn-valider-ouv').style.display = 'none';
   }
-
-  // Restaurer les données d'ouverture au chargement
-  (function() {
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-    try {
-      var d = JSON.parse(saved);
-      document.getElementById('f-date').value        = d.date        || '';
-      document.getElementById('f-responsable').value = d.responsable || '';
-      document.getElementById('f-service').value     = d.service     || '';
-      document.getElementById('f-fond-ouv').value    = d.fond_ouv    || '';
-      calculate();
-      document.getElementById('btn-valider-ouv').style.display  = 'none';
-      document.getElementById('bloc-cloture').style.display     = 'block';
-      document.getElementById('submit-final').style.display     = 'block';
-    } catch(e) { localStorage.removeItem(STORAGE_KEY); }
-  })();
 
 </script>
 </body>
