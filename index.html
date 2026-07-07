@@ -193,6 +193,13 @@
     .pin-key:active { background: var(--accent-l); transform: scale(0.96); }
     .pin-error    { font-size: 12px; color: var(--danger); margin-top: 14px; min-height: 16px; }
     .pin-checking { font-size: 12px; color: var(--muted); margin-top: 14px; display: none; }
+    #loading-gate {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: none; align-items: center; justify-content: center;
+      z-index: 9998;
+      font-size: 13px; color: var(--muted); font-weight: 300;
+    }
     @keyframes up { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   </style>
 </head>
@@ -226,6 +233,8 @@
     <div class="pin-checking" id="pin-checking">Vérification…</div>
   </div>
 </div>
+
+<div id="loading-gate">Vérification de l'ouverture en cours…</div>
 
 <div class="header">
   <div>
@@ -492,8 +501,20 @@
   }
 
   // ── App ──
+
+  // Date "métier" : avant 3h du matin, on considère qu'on est encore sur le
+  // service (et donc la date) de la veille, pour éviter qu'une clôture faite
+  // après minuit ne bascule sur le jour suivant et n'écrase l'ouverture du soir même.
+  function getBusinessDate() {
+    var now = new Date();
+    if (now.getHours() < 3) {
+      now.setDate(now.getDate() - 1);
+    }
+    return now;
+  }
+
   function initApp() {
-    var today = new Date();
+    var today = getBusinessDate();
     var yy = today.getFullYear();
     var mm = String(today.getMonth()+1).padStart(2,'0');
     var dd = String(today.getDate()).padStart(2,'0');
@@ -502,6 +523,22 @@
     var ds = today.toLocaleDateString('fr-FR', opts);
     document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase()+ds.slice(1);
     document.getElementById('badge-date').textContent = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+
+    // Verrou anti-écrasement : tant qu'on n'a pas su s'il existe une ouverture
+    // en cours (non encore clôturée), on bloque l'interface pour éviter qu'un
+    // clic prématuré sur "Valider l'ouverture" n'écrase les données déjà saisies
+    // le matin même (ou avant minuit).
+    var gate = document.getElementById('loading-gate');
+    if (gate) gate.style.display = 'flex';
+    var gateCleared = false;
+    function clearGate() {
+      if (gateCleared) return;
+      gateCleared = true;
+      if (gate) gate.style.display = 'none';
+    }
+    // Sécurité : si la requête réseau traîne ou échoue, on débloque quand même
+    // l'interface au bout de 6s plutôt que de laisser l'écran bloqué.
+    setTimeout(clearGate, 6000);
 
     // Récupérer espèces comptées via JSONP
     window._onFondVeille = function(data) {
@@ -517,6 +554,7 @@
 
     // Récupérer ouverture en cours via JSONP
     window._onOuvertureSheet = function(data) {
+      clearGate();
       if (data && data.status === 'ok' && data.ouverture) {
         var d = data.ouverture;
         if (d.date)        document.getElementById('f-date').value        = d.date;
@@ -528,10 +566,12 @@
         document.getElementById('bloc-cloture').style.display    = 'block';
         document.getElementById('submit-final').style.display    = 'block';
       }
+      // Si data.ouverture est null : aucune ouverture en cours, on laisse
+      // le bloc d'ouverture (déjà visible par défaut) tel quel.
     };
     var s2 = document.createElement('script');
     s2.src = SCRIPT_URL + '?action=get_ouverture&callback=_onOuvertureSheet&t=' + Date.now();
-    s2.onerror = function(){};
+    s2.onerror = function(){ clearGate(); };
     document.head.appendChild(s2);
   }
 
@@ -589,7 +629,30 @@
   for (var i=0; i<ids.length; i++)
     document.getElementById(ids[i]).addEventListener('input', calculate);
 
+  function validateCloture() {
+    var required = [
+      ['f-th-esp',   'Espèces (ventes théoriques)'],
+      ['f-th-cb',    'CB (ventes théoriques)'],
+      ['f-th-qr',    'QR code (ventes théoriques)'],
+      ['f-reel',     'Espèces comptées physiquement']
+    ];
+    for (var i=0; i<required.length; i++) {
+      var el = document.getElementById(required[i][0]);
+      if (!el || el.value === '') {
+        alert("Veuillez renseigner le champ « " + required[i][1] + " » avant d'envoyer la clôture.");
+        el && el.focus();
+        return false;
+      }
+    }
+    if (document.getElementById('f-fond-ouv').value === '') {
+      alert("Le fond de caisse à l'ouverture est manquant : validez d'abord l'ouverture avant de clôturer.");
+      return false;
+    }
+    return true;
+  }
+
   function submitForm() {
+    if (!validateCloture()) return;
     var btn = document.getElementById('btn-submit');
     btn.textContent = 'Envoi en cours…'; btn.disabled = true;
     var params = [
