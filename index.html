@@ -120,6 +120,21 @@
     .ecart-value { font-size: 22px; font-weight: 600; color: var(--text); }
     .ecart-ok  { color: var(--success); }
     .ecart-err { color: var(--danger); }
+    .coffre-block { background: #faeeda; }
+    .coffre-value {
+      border: none; background: transparent; padding: 0; text-align: right;
+      font-family: 'Sora', sans-serif; font-size: 25px; font-weight: 700;
+      color: #854F0B; width: 130px; outline: none;
+    }
+    .coffre-value:not([readonly]) {
+      border: 1px solid #854F0B; border-radius: 7px; padding: 6px 10px;
+      background: #fff; width: 110px;
+    }
+    .coffre-edit-btn {
+      flex-shrink: 0; width: 34px; height: 34px; border: 1px solid var(--border);
+      border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer;
+      font-size: 14px;
+    }
     .alert-box { border-radius: 8px; padding: 14px 16px; margin-top: 12px; display: none; }
     .alert-ok  { background: #f0faf4; border-left: 3px solid var(--success); }
     .alert-ok  .alert-title { color: #1e8449; font-weight: 600; font-size: 13px; margin-bottom: 3px; }
@@ -315,27 +330,13 @@
   <div class="card">
     <div class="card-header">
       <div class="card-num">3</div>
-      <span class="card-title">Ventes théoriques (depuis Lightspeed)</span>
+      <span class="card-title">Recette espèces théorique (depuis Lightspeed)</span>
       <span class="card-badge badge-close">À la clôture</span>
     </div>
     <div class="card-body">
-      <div class="grid-3">
-        <div class="field">
-          <label>Espèces (€)</label>
-          <input type="number" id="f-th-esp" placeholder="0.00" step="0.01" min="0">
-        </div>
-        <div class="field">
-          <label>CB (€)</label>
-          <input type="number" id="f-th-cb" placeholder="0.00" step="0.01" min="0">
-        </div>
-        <div class="field">
-          <label>QR code (€)</label>
-          <input type="number" id="f-th-qr" placeholder="0.00" step="0.01" min="0">
-        </div>
-      </div>
-      <div class="total-line">
-        <span class="total-label">Total théorique</span>
-        <span class="total-value" id="out-total-th">—</span>
+      <div class="field">
+        <label>Espèces (€)</label>
+        <input type="number" id="f-th-esp" placeholder="0.00" step="0.01" min="0">
       </div>
       <div class="total-line">
         <span class="total-label">Fonds théorique attendu en caisse</span>
@@ -352,23 +353,25 @@
       <span class="card-badge badge-close">À la clôture</span>
     </div>
     <div class="card-body">
-      <div class="grid-2">
-        <div class="field">
-          <label>Dépense de dépannage (€)</label>
-          <input type="number" id="f-depannage" placeholder="0.00" step="0.01" min="0">
-          <span class="field-hint">Glisser le justificatif dans l'enveloppe</span>
+      <div class="field">
+        <label>Dépense de dépannage (€)</label>
+        <input type="number" id="f-depannage" placeholder="0.00" step="0.01" min="0">
+        <span class="field-hint">Glisser le justificatif dans l'enveloppe</span>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="ecart-block coffre-block">
+          <span class="ecart-label">Montant à mettre au coffre</span>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="number" id="f-coffre" class="coffre-value" readonly tabindex="-1" placeholder="—" step="0.01" min="0">
+            <button type="button" id="btn-edit-coffre" class="coffre-edit-btn" onclick="toggleCoffreEdit()" title="Corriger le montant">✎</button>
+          </div>
         </div>
-        <div class="field">
-          <label>Espèces mises au coffre (€)</label>
-          <input type="number" id="f-sorties" placeholder="0.00" step="0.01" min="0">
-          <span class="field-hint">Mettre le CA espèces dans l'enveloppe - billets uniquement</span>
-        </div>
+        <span class="field-hint">Auto : (recette espèces − dépannage) arrondi à la dizaine inférieure. Cliquez sur ✎ pour corriger si besoin (manque de monnaie, etc).</span>
       </div>
       <div style="margin-top:16px;">
         <div class="field">
-          <label>Nouveau fonds de caisse (€)</label>
+          <label>Montant qui doit rester en caisse (€)</label>
           <input type="number" id="out-nouveau-fond" class="computed" readonly tabindex="-1" placeholder="—">
-          
         </div>
       </div>
     </div>
@@ -402,26 +405,10 @@
     </div>
   </div>
 
-  <!-- 6. POURBOIRES -->
+  <!-- 6. NOTES -->
   <div class="card">
     <div class="card-header">
       <div class="card-num">6</div>
-      <span class="card-title">Pourboires</span>
-      <span class="card-badge badge-close">À la clôture</span>
-    </div>
-    <div class="card-body">
-      <div class="field">
-        <label>Montant total des pourboires (€)</label>
-        <input type="number" id="f-pourboires" placeholder="0.00" step="0.01" min="0">
-        <span class="field-hint">Pourboires mis au coffre</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 7. NOTES -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-num">7</div>
       <span class="card-title">Notes</span>
     </div>
     <div class="card-body">
@@ -456,7 +443,7 @@
 </div>
 
 <script>
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycfjcsmXrGpAES58hUa2KZ78nTNbIL2WGZ_R24YaV1nIas1yGIuQJHeeG2mFzxjHpCjg/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlPFi6zfhU9-Bzj8Lz6KEdNdGskfEVntOE7XX8penAlzLjfYKMccv8X9YgtLxShnK18Q/exec';
   var PIN_AUTH   = 'rosario_pin_ok';
 
   // ── PIN ──
@@ -584,19 +571,54 @@
     return (Math.round(v*100)/100).toFixed(2).replace('.',',') + ' €';
   }
 
+  // Le montant à mettre au coffre est calculé automatiquement
+  // (floor10(recette − dépannage)) tant que coffreOverride est false. Le
+  // bouton ✎ (toggleCoffreEdit) permet de le corriger à la main (ex: pas
+  // assez de monnaie pour arrondir pile) ; il repasse en mode auto au clic
+  // suivant sur le même bouton.
+  var coffreOverride = false;
+  function floor10(v) { return Math.floor(v/10)*10; }
+
+  function toggleCoffreEdit() {
+    var el  = document.getElementById('f-coffre');
+    var btn = document.getElementById('btn-edit-coffre');
+    if (el.hasAttribute('readonly')) {
+      el.removeAttribute('readonly');
+      el.tabIndex = 0;
+      btn.textContent = '↺';
+      btn.title = 'Revenir au calcul automatique';
+      el.focus(); el.select();
+    } else {
+      coffreOverride = false;
+      el.setAttribute('readonly', 'readonly');
+      el.tabIndex = -1;
+      btn.textContent = '✎';
+      btn.title = 'Corriger le montant';
+      calculate();
+    }
+  }
+  document.getElementById('f-coffre').addEventListener('input', function() {
+    if (!this.hasAttribute('readonly')) { coffreOverride = true; calculate(); }
+  });
+
   function calculate() {
     var fondOuv   = n('f-fond-ouv');
     var thEsp     = n('f-th-esp');
-    var thCb      = n('f-th-cb');
-    var thQr      = n('f-th-qr');
     var reel      = n('f-reel');
-    var sorties   = n('f-sorties');
     var depannage = n('f-depannage');
-    var totalTh     = thEsp + thCb + thQr;
+
+    var coffreEl = document.getElementById('f-coffre');
+    var montantCoffre;
+    if (coffreOverride) {
+      montantCoffre = n('f-coffre');
+    } else {
+      montantCoffre = Math.max(0, floor10(thEsp - depannage));
+      coffreEl.value = montantCoffre.toFixed(2);
+    }
+
     var fondTh      = fondOuv + thEsp;
-    var nouveauFond = fondOuv + thEsp - sorties - depannage;
+    var nouveauFond = fondOuv + thEsp - depannage - montantCoffre;
     var ecart       = reel - nouveauFond;
-    document.getElementById('out-total-th').textContent = fmt(totalTh);
     document.getElementById('out-fond-th').textContent  = fmt(fondTh);
     var nfEl = document.getElementById('out-nouveau-fond');
     nfEl.value = document.getElementById('f-fond-ouv').value !== '' ? nouveauFond.toFixed(2) : '';
@@ -612,7 +634,7 @@
       } else if (ecart > 0) {
         ecartEl.className = 'ecart-value ecart-ok';
         alertOk.style.display = 'block'; alertErr.style.display = 'none';
-        document.getElementById('alert-ok-sub').textContent = 'Excédent de ' + fmt(ecart) + ' en caisse.';
+        document.getElementById('alert-ok-sub').textContent = 'Excédent de ' + fmt(ecart) + ' en caisse (pourboires).';
       } else {
         ecartEl.className = 'ecart-value ecart-ok';
         alertOk.style.display = 'block'; alertErr.style.display = 'none';
@@ -624,15 +646,13 @@
     }
   }
 
-  var ids = ['f-fond-ouv','f-th-esp','f-th-cb','f-th-qr','f-reel','f-sorties','f-depannage'];
+  var ids = ['f-fond-ouv','f-th-esp','f-reel','f-depannage'];
   for (var i=0; i<ids.length; i++)
     document.getElementById(ids[i]).addEventListener('input', calculate);
 
   function validateCloture() {
     var required = [
-      ['f-th-esp',   'Espèces (ventes théoriques)'],
-      ['f-th-cb',    'CB (ventes théoriques)'],
-      ['f-th-qr',    'QR code (ventes théoriques)'],
+      ['f-th-esp',   'Espèces (recette théorique)'],
       ['f-reel',     'Espèces comptées physiquement']
     ];
     for (var i=0; i<required.length; i++) {
@@ -661,13 +681,10 @@
       'service='        + encodeURIComponent(document.getElementById('f-service').value),
       'fond_ouverture=' + n('f-fond-ouv'),
       'th_especes='     + n('f-th-esp'),
-      'th_cb='          + n('f-th-cb'),
-      'th_qr='          + n('f-th-qr'),
       'reel_especes='   + n('f-reel'),
-      'sorties='        + n('f-sorties'),
+      'sorties='        + n('f-coffre'),
       'depannage='      + n('f-depannage'),
       'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value)||0),
-      'pourboires='     + n('f-pourboires'),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
     showSuccess();
