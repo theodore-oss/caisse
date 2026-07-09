@@ -685,6 +685,14 @@
       'sorties='        + n('f-coffre'),
       'depannage='      + n('f-depannage'),
       'nouveau_fond='   + (parseFloat(document.getElementById('out-nouveau-fond').value)||0),
+      // Écart de caisse du service (= "Pourboires" côté Sheet, colonne 17) —
+      // même formule que le backend (ecart = reel_especes - nouveau_fond),
+      // recalculée ici à partir de nouveau_fond pour rester identique à ce
+      // qui est déjà envoyé juste au-dessus, sans dépendre du texte affiché
+      // à l'écran (qui a un préfixe "+"). Avant ce champ, "Pourboires (€)"
+      // n'était jamais envoyé par le formulaire et restait donc toujours à
+      // 0 côté Sheet, quel que soit l'écart réel du service.
+      'pourboires='     + (n('f-reel') - (parseFloat(document.getElementById('out-nouveau-fond').value)||0)),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
     showSuccess();
