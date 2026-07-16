@@ -317,8 +317,9 @@
         <strong>Valider l'ouverture</strong><br>
         Les sections 1 et 2 seront verrouillées et sauvegardées.
       </div>
-      <button type="button" class="submit-btn" onclick="validerOuverture()">Valider l'ouverture →</button>
+      <button type="button" class="submit-btn" id="btn-valider-ouv-btn" onclick="validerOuverture()">Valider l'ouverture →</button>
     </div>
+    <div id="ouverture-error" style="display:none;margin-top:10px;padding:10px 14px;background:#fbeae2;color:#a3491f;border-radius:8px;font-size:12.5px;"></div>
   </div>
 
   </div><!-- /bloc-ouverture -->
@@ -429,6 +430,7 @@
     </div>
     <button class="submit-btn" id="btn-submit" onclick="submitForm()">Envoyer →</button>
   </div>
+  <div id="submit-error" style="display:none;margin-top:10px;padding:10px 14px;background:#fbeae2;color:#a3491f;border-radius:8px;font-size:12.5px;"></div>
 
 </div>
 
@@ -670,10 +672,55 @@
     return true;
   }
 
+  // JSONP générique (mêmes garanties que _onFondVeille/_onOuvertureSheet
+  // plus haut, qui fonctionnent déjà de façon fiable dans ce fichier) — pour
+  // remplacer submitForm()/validerOuverture(), qui envoyaient la clôture et
+  // l'ouverture via un XMLHttpRequest fire-and-forget SANS AUCUN gestionnaire
+  // de succès/erreur (try/catch vide autour du seul xhr.send()). submitForm
+  // affichait même l'écran "Clôture enregistrée" AVANT d'envoyer la requête,
+  // inconditionnellement. Conséquence potentielle (jamais confirmée en
+  // pratique, mais aucun moyen de le savoir avec l'ancien code) : le staff
+  // voit "Envoyé" et repart alors que la clôture du jour n'a jamais été
+  // écrite dans le Sheet (réseau, quota Apps Script, etc.) — trouvé le 11/07
+  // en auditant le même type de bug déjà corrigé côté app de réconciliation
+  // (validation de dépôt qui "revenait comme avant" au rechargement).
+  function jsonpRequest(url, timeoutMs, onDone) {
+    var cbName = '_recon_cloture_cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    var done = false;
+    var script = document.createElement('script');
+    var timeoutId = setTimeout(function() {
+      if (done) return;
+      done = true;
+      delete window[cbName];
+      script.remove();
+      onDone({ ok: false, reason: 'pas de réponse du serveur après ' + Math.round(timeoutMs / 1000) + 's.' });
+    }, timeoutMs);
+    window[cbName] = function(data) {
+      if (done) return;
+      done = true;
+      clearTimeout(timeoutId);
+      delete window[cbName];
+      script.remove();
+      if (data && data.status === 'ok') onDone({ ok: true, data: data });
+      else onDone({ ok: false, reason: (data && data.message) || 'réponse invalide du serveur.' });
+    };
+    script.onerror = function() {
+      if (done) return;
+      done = true;
+      clearTimeout(timeoutId);
+      delete window[cbName];
+      script.remove();
+      onDone({ ok: false, reason: 'échec réseau (vérifie ta connexion).' });
+    };
+    script.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'callback=' + cbName + '&t=' + Date.now();
+    document.head.appendChild(script);
+  }
+
   function submitForm() {
     if (!validateCloture()) return;
     var btn = document.getElementById('btn-submit');
     btn.textContent = 'Envoi en cours…'; btn.disabled = true;
+    hideSubmitError();
     var params = [
       'action=submit',
       'date='           + encodeURIComponent(document.getElementById('f-date').value),
@@ -695,12 +742,23 @@
       'pourboires='     + (n('f-reel') - (parseFloat(document.getElementById('out-nouveau-fond').value)||0)),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
     ].join('&');
-    showSuccess();
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', SCRIPT_URL + '?' + params, true);
-      xhr.send();
-    } catch(e) {}
+    jsonpRequest(SCRIPT_URL + '?' + params, 20000, function(res) {
+      if (res.ok) {
+        showSuccess();
+      } else {
+        btn.textContent = 'Envoyer →'; btn.disabled = false;
+        var err = document.getElementById('submit-error');
+        if (err) {
+          err.textContent = '✗ Échec de l\'envoi — ' + res.reason + ' Rien n\'a été enregistré, réessaie avant de quitter la page.';
+          err.style.display = 'block';
+        }
+      }
+    });
+  }
+
+  function hideSubmitError() {
+    var err = document.getElementById('submit-error');
+    if (err) err.style.display = 'none';
   }
 
   function showSuccess() {
@@ -723,18 +781,33 @@
       alert("Veuillez remplir toutes les informations d'ouverture avant de sauvegarder.");
       return;
     }
-    try {
-      var xhr = new XMLHttpRequest();
-      var p = 'action=save_ouverture&date=' + encodeURIComponent(date)
-            + '&responsable=' + encodeURIComponent(resp)
-            + '&service='     + encodeURIComponent(service)
-            + '&fond_ouv='    + encodeURIComponent(fond);
-      xhr.open('GET', SCRIPT_URL + '?' + p, true);
-      xhr.send();
-    } catch(e) {}
-    document.getElementById('bloc-cloture').style.display    = 'block';
-    document.getElementById('submit-final').style.display    = 'block';
-    document.getElementById('btn-valider-ouv').style.display = 'none';
+    var btn = document.getElementById('btn-valider-ouv-btn');
+    var btnOriginalText = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = 'Enregistrement…'; btn.disabled = true; }
+    hideOuvertureError();
+    var p = 'action=save_ouverture&date=' + encodeURIComponent(date)
+          + '&responsable=' + encodeURIComponent(resp)
+          + '&service='     + encodeURIComponent(service)
+          + '&fond_ouv='    + encodeURIComponent(fond);
+    jsonpRequest(SCRIPT_URL + '?' + p, 20000, function(res) {
+      if (res.ok) {
+        document.getElementById('bloc-cloture').style.display    = 'block';
+        document.getElementById('submit-final').style.display    = 'block';
+        document.getElementById('btn-valider-ouv').style.display = 'none';
+      } else {
+        if (btn) { btn.textContent = btnOriginalText; btn.disabled = false; }
+        var err = document.getElementById('ouverture-error');
+        if (err) {
+          err.textContent = '✗ Échec de l\'enregistrement — ' + res.reason + ' Rien n\'a été sauvegardé, réessaie.';
+          err.style.display = 'block';
+        }
+      }
+    });
+  }
+
+  function hideOuvertureError() {
+    var err = document.getElementById('ouverture-error');
+    if (err) err.style.display = 'none';
   }
 
 </script>
