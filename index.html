@@ -441,7 +441,7 @@
   <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Clôture enregistrée</h2>
   <p style="font-size:13px;color:#8a8680;margin-bottom:4px;">Les données ont été envoyées vers le Google Sheet.</p>
   <p id="success-timestamp" style="font-size:12px;color:#b0aca6;margin-bottom:32px;"></p>
-  <button onclick="window.location.reload()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
+  <button onclick="resetForm()" style="font-family:'Sora',sans-serif;font-size:13px;font-weight:600;background:#fff;color:#8B1A1A;border:1px solid #d9b0b0;border-radius:8px;padding:12px 28px;cursor:pointer;">← Nouvelle clôture</button>
 </div>
 
 <script>
@@ -501,12 +501,17 @@
     return now;
   }
 
+  // Mémorise la date métier active pendant que la page reste ouverte, pour
+  // détecter un changement de jour (voir checkBusinessDayRollover plus bas).
+  var lastBusinessDateStr = null;
+
   function initApp() {
     var today = getBusinessDate();
     var yy = today.getFullYear();
     var mm = String(today.getMonth()+1).padStart(2,'0');
     var dd = String(today.getDate()).padStart(2,'0');
-    document.getElementById('f-date').value = yy+'-'+mm+'-'+dd;
+    lastBusinessDateStr = yy+'-'+mm+'-'+dd;
+    document.getElementById('f-date').value = lastBusinessDateStr;
     var opts = { weekday:'long', day:'numeric', month:'long', year:'numeric' };
     var ds = today.toLocaleDateString('fr-FR', opts);
     document.getElementById('date-sub').textContent = ds.charAt(0).toUpperCase()+ds.slice(1);
@@ -562,6 +567,7 @@
     s2.onerror = function(){ clearGate(); };
     document.head.appendChild(s2);
   }
+
 
   function n(id) {
     var el = document.getElementById(id);
@@ -770,6 +776,54 @@
     });
     var h = document.querySelector('.header'); if (h) h.style.display = 'none';
     document.getElementById('success').style.display = 'block';
+    // Réinitialisation automatique par défaut, sans attendre un rechargement
+    // manuel ou un changement de date : dès qu'une clôture est validée, le
+    // formulaire redevient utilisable pour l'ouverture suivante (jour
+    // suivant, ou service suivant le même jour). On laisse quelques
+    // secondes pour que le message de confirmation reste lisible.
+    setTimeout(resetForm, 5000);
+  }
+
+  // Remet le formulaire à zéro (équivalent d'un rechargement de page, sans
+  // recharger réellement) : vide tous les champs de saisie, restaure
+  // l'affichage initial (bloc ouverture visible, bloc clôture masqué), et
+  // relance initApp() pour resynchroniser avec le Sheet (date métier,
+  // dernières espèces comptées, éventuelle ouverture déjà en cours ailleurs).
+  function resetForm() {
+    ['f-responsable', 'f-fond-ouv', 'f-th-esp', 'f-reel', 'f-depannage', 'f-notes'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('f-service').value = '';
+
+    coffreOverride = false;
+    var coffreEl = document.getElementById('f-coffre');
+    if (coffreEl) { coffreEl.value = ''; coffreEl.setAttribute('readonly', 'readonly'); coffreEl.tabIndex = -1; }
+    var btnEdit = document.getElementById('btn-edit-coffre');
+    if (btnEdit) { btnEdit.textContent = '✎'; btnEdit.title = 'Corriger le montant'; }
+
+    document.getElementById('out-fond-th').textContent = '—';
+    document.getElementById('out-nouveau-fond').value = '';
+    document.getElementById('out-ecart').textContent = '—';
+    document.getElementById('out-ecart').className = 'ecart-value';
+    document.getElementById('alert-ok').style.display = 'none';
+    document.getElementById('alert-err').style.display = 'none';
+    document.getElementById('hint-veille').textContent = '';
+    hideOuvertureError();
+    hideSubmitError();
+
+    var btnOuv = document.getElementById('btn-valider-ouv-btn');
+    if (btnOuv) { btnOuv.textContent = "Valider l'ouverture →"; btnOuv.disabled = false; }
+    var btnSub = document.getElementById('btn-submit');
+    if (btnSub) { btnSub.textContent = 'Envoyer →'; btnSub.disabled = false; }
+
+    document.getElementById('bloc-ouverture').style.display = '';
+    document.getElementById('bloc-cloture').style.display    = 'none';
+    document.getElementById('submit-final').style.display    = 'none';
+    document.getElementById('btn-valider-ouv').style.display = '';
+    document.getElementById('success').style.display = 'none';
+    var h = document.querySelector('.header'); if (h) h.style.display = '';
+
+    initApp();
   }
 
   function validerOuverture() {
