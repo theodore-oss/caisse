@@ -278,7 +278,17 @@
         </div>
         <div class="field">
           <label>Responsable</label>
-          <input type="text" id="f-responsable" placeholder="Prénom">
+          <select id="f-responsable">
+            <option value="">— Sélectionner —</option>
+          </select>
+          <button type="button" class="field-hint" id="btn-gerer-personnel" onclick="togglePersonnelPanel()" style="background:none;border:none;color:#8B1A1A;text-decoration:underline;cursor:pointer;padding:0;text-align:left;">Gérer la liste</button>
+          <div id="personnel-panel" style="display:none;margin-top:6px;padding:10px;background:var(--bg);border-radius:7px;">
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <input type="text" id="personnel-nouveau-nom" placeholder="Nouveau prénom" style="flex:1;">
+              <button type="button" onclick="ajouterPersonnel()" style="font-family:'Sora',sans-serif;font-size:12px;font-weight:600;background:#8B1A1A;color:#fff;border:none;border-radius:6px;padding:0 12px;cursor:pointer;">Ajouter</button>
+            </div>
+            <ul id="personnel-liste" style="list-style:none;font-size:12px;"></ul>
+          </div>
         </div>
         <div class="field">
           <label>Service</label>
@@ -448,6 +458,18 @@
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlPFi6zfhU9-Bzj8Lz6KEdNdGskfEVntOE7XX8penAlzLjfYKMccv8X9YgtLxShnK18Q/exec';
   var PIN_AUTH   = 'rosario_pin_ok';
 
+  // Le PIN validé est conservé pour la durée de l'onglet et renvoyé au
+  // serveur à CHAQUE appel : depuis l'audit du 31/07, le backend exige
+  // &pin=... sur toutes les actions de clôture, pas seulement à l'entrée.
+  // Avant ça, l'URL /exec — publique, en clair juste au-dessus — suffisait
+  // à lire et écrire dans le classeur sans jamais connaître le code.
+  // sessionStorage plutôt que localStorage : effacé à la fermeture de
+  // l'onglet, donc le code ne traîne pas sur une tablette partagée.
+  var PIN_VALUE  = 'rosario_pin_val';
+  function pinParam() {
+    return '&pin=' + encodeURIComponent(sessionStorage.getItem(PIN_VALUE) || '');
+  }
+
   // ── PIN ──
   var pinVal = '';
   function pk(d) {
@@ -469,21 +491,38 @@
   function checkPin() {
     document.getElementById('pin-checking').style.display = 'block';
     var pinToCheck = pinVal;
-    // Vérification par hash SHA-256 — le PIN n'est pas en clair
-    crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinToCheck)).then(function(buf) {
-      var hash = Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    // Vérification côté serveur (action check_pin) — le code n'est plus
+    // comparé à un hash embarqué dans ce fichier public sur GitHub, qui
+    // pouvait être extrait et cassé hors ligne (4 chiffres = 10 000
+    // combinaisons). Correctif du 31/07.
+    jsonpRequest(SCRIPT_URL + '?action=check_pin&pin=' + encodeURIComponent(pinToCheck), 10000, function(res) {
       document.getElementById('pin-checking').style.display = 'none';
-      if (hash === '2926a2731f4b312c08982cacf8061eb14bf65c1a87cc5d70e864e079c6220731') {
+      if (res.ok && res.data && res.data.ok === true) {
         sessionStorage.setItem(PIN_AUTH, '1');
+        sessionStorage.setItem(PIN_VALUE, pinToCheck);
         document.getElementById('pin-screen').style.display = 'none';
         initApp();
       } else {
-        document.getElementById('pin-error').textContent = 'Code incorrect, réessayez.';
+        // res.reason porte le message du serveur quand il y en a un — c'est
+        // par là qu'arrive "Trop de codes erronés, réessaie dans une
+        // quinzaine de minutes" (limitation anti-brute-force côté Code.gs).
+        document.getElementById('pin-error').textContent =
+          res.ok ? 'Code incorrect, réessayez.' : (res.reason || 'Connexion impossible, réessayez.');
         pinVal = ''; updateDots();
       }
     });
   }
-  if (sessionStorage.getItem(PIN_AUTH) === '1') {
+  // Réaffiche l'écran de code après un refus du serveur (PIN changé côté
+  // Apps Script pendant que l'onglet était ouvert).
+  function redemanderPin() {
+    sessionStorage.removeItem(PIN_AUTH);
+    sessionStorage.removeItem(PIN_VALUE);
+    pinVal = ''; updateDots();
+    document.getElementById('pin-error').textContent = 'Le code a changé, ressaisis-le.';
+    document.getElementById('pin-screen').style.display = '';
+  }
+
+  if (sessionStorage.getItem(PIN_AUTH) === '1' && sessionStorage.getItem(PIN_VALUE)) {
     document.getElementById('pin-screen').style.display = 'none';
     initApp();
   }
@@ -535,39 +574,185 @@
 
     // Récupérer espèces comptées via JSONP
     window._onFondVeille = function(data) {
-      if (data && data.fond !== null && data.fond !== '') {
-        var hint = document.getElementById('hint-veille');
-        if (hint) hint.textContent = 'Dernières espèces comptées : ' + parseFloat(data.fond).toFixed(2).replace('.',',') + ' €';
-      }
+      // Le test sur status est indispensable : sur une réponse d'erreur
+      // (ex. "Accès refusé" si le PIN mémorisé n'est plus valable), data.fond
+      // est undefined, ce qui passait les deux comparaisons ci-dessous et
+      // affichait "Dernières espèces comptées : NaN €".
+      if (!data || data.status !== 'ok') return;
+      var fond = parseFloat(data.fond);
+      if (isNaN(fond)) return;
+      var hint = document.getElementById('hint-veille');
+      if (hint) hint.textContent = 'Dernières espèces comptées : ' + fond.toFixed(2).replace('.',',') + ' €';
     };
     var s1 = document.createElement('script');
-    s1.src = SCRIPT_URL + '?callback=_onFondVeille&t=' + Date.now();
+    s1.src = SCRIPT_URL + '?callback=_onFondVeille&t=' + Date.now() + pinParam();
     s1.onerror = function(){};
     document.head.appendChild(s1);
 
     // Récupérer ouverture en cours via JSONP
     window._onOuvertureSheet = function(data) {
       clearGate();
+      // PIN mémorisé devenu invalide (code changé côté Apps Script depuis
+      // que cet onglet est ouvert) : on redemande le code plutôt que de
+      // laisser un formulaire vide dont aucun bouton ne fonctionnerait.
+      if (data && data.code === 'pin') { redemanderPin(); return; }
       if (data && data.status === 'ok' && data.ouverture) {
         var d = data.ouverture;
         if (d.date)        document.getElementById('f-date').value        = d.date;
-        if (d.responsable) document.getElementById('f-responsable').value = d.responsable;
+        if (d.responsable) { pendingResponsableValue = d.responsable; applyPendingResponsable(); }
         if (d.service)     document.getElementById('f-service').value     = d.service;
         if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
         calculate();
         document.getElementById('btn-valider-ouv').style.display = 'none';
         document.getElementById('bloc-cloture').style.display    = 'block';
         document.getElementById('submit-final').style.display    = 'block';
+        restoreDraftIfMatching();
       }
       // Si data.ouverture est null : aucune ouverture en cours, on laisse
       // le bloc d'ouverture (déjà visible par défaut) tel quel.
     };
     var s2 = document.createElement('script');
-    s2.src = SCRIPT_URL + '?action=get_ouverture&callback=_onOuvertureSheet&t=' + Date.now();
+    s2.src = SCRIPT_URL + '?action=get_ouverture&callback=_onOuvertureSheet&t=' + Date.now() + pinParam();
     s2.onerror = function(){ clearGate(); };
     document.head.appendChild(s2);
+
+    loadPersonnel();
   }
 
+  // ── Personnel (liste déroulante "Responsable", gérable depuis le formulaire) ──
+  var personnelNoms = [];
+  var pendingResponsableValue = null; // valeur restaurée par _onOuvertureSheet, tant que get_personnel n'a pas encore répondu
+
+  function loadPersonnel() {
+    var s = document.createElement('script');
+    s.src = SCRIPT_URL + '?action=get_personnel&callback=_onPersonnel&t=' + Date.now() + pinParam();
+    document.head.appendChild(s);
+  }
+  window._onPersonnel = function(data) {
+    personnelNoms = (data && data.noms) || [];
+    renderPersonnelSelect();
+    renderPersonnelPanel();
+    applyPendingResponsable();
+  };
+
+  function escapeHtml_(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function renderPersonnelSelect() {
+    var sel = document.getElementById('f-responsable');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+      personnelNoms.map(function(n){ return '<option>' + escapeHtml_(n) + '</option>'; }).join('');
+    if (personnelNoms.indexOf(current) !== -1) sel.value = current;
+  }
+
+  function renderPersonnelPanel() {
+    var ul = document.getElementById('personnel-liste');
+    if (!ul) return;
+    ul.innerHTML = personnelNoms.map(function(n) {
+      return '<li style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;">' +
+        '<span>' + escapeHtml_(n) + '</span>' +
+        '<button type="button" onclick="supprimerPersonnel(' + JSON.stringify(n).replace(/"/g, '&quot;') + ')" ' +
+        'style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;">✕</button></li>';
+    }).join('');
+  }
+
+  // Si un nom restauré (ouverture en cours) n'est plus dans la liste (retiré
+  // depuis), on l'ajoute quand même comme option temporaire pour ne jamais
+  // perdre l'info de qui a ouvert la caisse.
+  function applyPendingResponsable() {
+    if (!pendingResponsableValue) return;
+    var sel = document.getElementById('f-responsable');
+    if (personnelNoms.indexOf(pendingResponsableValue) === -1) {
+      var opt = document.createElement('option');
+      opt.textContent = pendingResponsableValue;
+      sel.appendChild(opt);
+    }
+    sel.value = pendingResponsableValue;
+  }
+
+  function togglePersonnelPanel() {
+    var p = document.getElementById('personnel-panel');
+    p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+  }
+
+  function ajouterPersonnel() {
+    var input = document.getElementById('personnel-nouveau-nom');
+    var nom = input.value.trim();
+    if (!nom) return;
+    jsonpRequest(SCRIPT_URL + '?action=add_personnel&nom=' + encodeURIComponent(nom) + pinParam(), 10000, function(res) {
+      if (res.ok && res.data && res.data.noms) {
+        personnelNoms = res.data.noms;
+        renderPersonnelSelect(); renderPersonnelPanel();
+        document.getElementById('f-responsable').value = nom;
+        input.value = '';
+      }
+    });
+  }
+
+  function supprimerPersonnel(nom) {
+    if (!confirm('Supprimer "' + nom + '" de la liste ?')) return;
+    jsonpRequest(SCRIPT_URL + '?action=remove_personnel&nom=' + encodeURIComponent(nom) + pinParam(), 10000, function(res) {
+      if (res.ok && res.data && res.data.noms) {
+        personnelNoms = res.data.noms;
+        renderPersonnelSelect(); renderPersonnelPanel();
+      }
+    });
+  }
+
+  // ── Autosave local (sections 3-7) ──
+  // Purement côté navigateur (localStorage, pas de sync serveur) : évite de
+  // tout reperdre si l'onglet crashe ou perd le réseau entre "Valider
+  // l'ouverture" et l'envoi de la clôture. Restauré uniquement si la date
+  // correspond à l'ouverture actuellement en cours (jamais un brouillon
+  // d'un autre jour).
+  var DRAFT_KEY = 'caisse_draft_cloture_v1';
+
+  function saveDraft() {
+    try {
+      var date = document.getElementById('f-date').value;
+      if (!date) return;
+      var draft = {
+        date: date,
+        th_esp: document.getElementById('f-th-esp').value,
+        reel: document.getElementById('f-reel').value,
+        depannage: document.getElementById('f-depannage').value,
+        coffre: document.getElementById('f-coffre').value,
+        coffreOverride: coffreOverride,
+        notes: document.getElementById('f-notes').value
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {}
+  }
+
+  function restoreDraftIfMatching() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      var draft = JSON.parse(raw);
+      if (!draft || draft.date !== document.getElementById('f-date').value) return;
+      if (draft.th_esp)    document.getElementById('f-th-esp').value = draft.th_esp;
+      if (draft.reel)      document.getElementById('f-reel').value = draft.reel;
+      if (draft.depannage) document.getElementById('f-depannage').value = draft.depannage;
+      if (draft.notes)     document.getElementById('f-notes').value = draft.notes;
+      if (draft.coffreOverride) {
+        coffreOverride = true;
+        var coffreEl = document.getElementById('f-coffre');
+        coffreEl.removeAttribute('readonly'); coffreEl.tabIndex = 0;
+        coffreEl.value = draft.coffre;
+        var btnEdit = document.getElementById('btn-edit-coffre');
+        if (btnEdit) { btnEdit.textContent = '↺'; btnEdit.title = 'Revenir au calcul automatique'; }
+      }
+      calculate();
+    } catch (e) {}
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  }
 
   function n(id) {
     var el = document.getElementById(id);
@@ -652,11 +837,13 @@
       ecartEl.textContent = '—'; ecartEl.className = 'ecart-value';
       alertOk.style.display = 'none'; alertErr.style.display = 'none';
     }
+    saveDraft();
   }
 
   var ids = ['f-fond-ouv','f-th-esp','f-reel','f-depannage'];
   for (var i=0; i<ids.length; i++)
     document.getElementById(ids[i]).addEventListener('input', calculate);
+  document.getElementById('f-notes').addEventListener('input', saveDraft);
 
   function validateCloture() {
     var required = [
@@ -708,7 +895,10 @@
       delete window[cbName];
       script.remove();
       if (data && data.status === 'ok') onDone({ ok: true, data: data });
-      else onDone({ ok: false, reason: (data && data.message) || 'réponse invalide du serveur.' });
+      // code : identifiant d'erreur stable renvoyé par le serveur (ex.
+      // 'doublon'), pour que l'appelant puisse réagir spécifiquement au lieu
+      // de devoir reconnaître un message en français.
+      else onDone({ ok: false, code: (data && data.code) || null, reason: (data && data.message) || 'réponse invalide du serveur.' });
     };
     script.onerror = function() {
       if (done) return;
@@ -722,7 +912,7 @@
     document.head.appendChild(script);
   }
 
-  function submitForm() {
+  function submitForm(force) {
     if (!validateCloture()) return;
     var btn = document.getElementById('btn-submit');
     btn.textContent = 'Envoi en cours…'; btn.disabled = true;
@@ -747,17 +937,35 @@
       // 0 côté Sheet, quel que soit l'écart réel du service.
       'pourboires='     + (n('f-reel') - (parseFloat(document.getElementById('out-nouveau-fond').value)||0)),
       'notes='          + encodeURIComponent(document.getElementById('f-notes').value)
-    ].join('&');
+    ].join('&') + pinParam() + (force ? '&force=1' : '');
     jsonpRequest(SCRIPT_URL + '?' + params, 20000, function(res) {
       if (res.ok) {
+        // Brouillon effacé dès le succès, sans attendre le resetForm() différé
+        // de showSuccess() : si l'onglet est fermé dans les 5 secondes, les
+        // montants de caisse restaient sinon en localStorage.
+        clearDraft();
         showSuccess();
-      } else {
-        btn.textContent = 'Envoyer →'; btn.disabled = false;
-        var err = document.getElementById('submit-error');
-        if (err) {
-          err.textContent = '✗ Échec de l\'envoi — ' + res.reason + ' Rien n\'a été enregistré, réessaie avant de quitter la page.';
-          err.style.display = 'block';
+        return;
+      }
+      btn.textContent = 'Envoyer →'; btn.disabled = false;
+      // Cas particulier : le serveur a détecté une clôture déjà enregistrée
+      // pour ce (date, service). C'est très probablement un renvoi après un
+      // timeout où l'écriture avait en fait réussi — on ne veut surtout pas
+      // créer une deuxième ligne en silence, mais une re-clôture volontaire
+      // reste possible en confirmant.
+      if (res.code === 'doublon') {
+        if (confirm("Une clôture est déjà enregistrée pour ce service à cette date.\n\n"
+                  + "C'est normal si ton envoi précédent avait affiché une erreur alors qu'il avait "
+                  + "en fait abouti — dans ce cas, annule : tout est déjà sauvegardé.\n\n"
+                  + "Envoyer quand même une deuxième clôture ?")) {
+          submitForm(true);
         }
+        return;
+      }
+      var err = document.getElementById('submit-error');
+      if (err) {
+        err.textContent = '✗ Échec de l\'envoi — ' + res.reason + ' Rien n\'a été enregistré, réessaie avant de quitter la page.';
+        err.style.display = 'block';
       }
     });
   }
@@ -823,6 +1031,7 @@
     document.getElementById('success').style.display = 'none';
     var h = document.querySelector('.header'); if (h) h.style.display = '';
 
+    clearDraft();
     initApp();
   }
 
@@ -842,12 +1051,14 @@
     var p = 'action=save_ouverture&date=' + encodeURIComponent(date)
           + '&responsable=' + encodeURIComponent(resp)
           + '&service='     + encodeURIComponent(service)
-          + '&fond_ouv='    + encodeURIComponent(fond);
+          + '&fond_ouv='    + encodeURIComponent(fond)
+          + pinParam();
     jsonpRequest(SCRIPT_URL + '?' + p, 20000, function(res) {
       if (res.ok) {
         document.getElementById('bloc-cloture').style.display    = 'block';
         document.getElementById('submit-final').style.display    = 'block';
         document.getElementById('btn-valider-ouv').style.display = 'none';
+        restoreDraftIfMatching();
       } else {
         if (btn) { btn.textContent = btnOriginalText; btn.disabled = false; }
         var err = document.getElementById('ouverture-error');
