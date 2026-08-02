@@ -495,7 +495,12 @@
     // comparé à un hash embarqué dans ce fichier public sur GitHub, qui
     // pouvait être extrait et cassé hors ligne (4 chiffres = 10 000
     // combinaisons). Correctif du 31/07.
-    jsonpRequest(SCRIPT_URL + '?action=check_pin&pin=' + encodeURIComponent(pinToCheck), 10000, function(res) {
+    // 20s et non 10s : Apps Script démarre son conteneur à froid après une
+    // période d'inactivité, et le premier appel de la journée peut largement
+    // dépasser 10s — le staff voyait alors "pas de réponse du serveur après
+    // 10s" sur un serveur qui répondait très bien, juste un peu plus tard.
+    // Même budget que les autres appels du formulaire (envoi, ouverture).
+    jsonpRequest(SCRIPT_URL + '?action=check_pin&pin=' + encodeURIComponent(pinToCheck), 20000, function(res) {
       document.getElementById('pin-checking').style.display = 'none';
       if (res.ok && res.data && res.data.ok === true) {
         sessionStorage.setItem(PIN_AUTH, '1');
@@ -948,6 +953,10 @@
         return;
       }
       btn.textContent = 'Envoyer →'; btn.disabled = false;
+      // PIN refusé par le serveur : plutôt qu'un message sans issue, on
+      // redemande le code — la saisie de clôture reste à l'écran derrière et
+      // n'est pas perdue (elle est aussi dans le brouillon local).
+      if (res.code === 'pin') { redemanderPin(); return; }
       // Cas particulier : le serveur a détecté une clôture déjà enregistrée
       // pour ce (date, service). C'est très probablement un renvoi après un
       // timeout où l'écriture avait en fait réussi — on ne veut surtout pas
@@ -1061,6 +1070,7 @@
         restoreDraftIfMatching();
       } else {
         if (btn) { btn.textContent = btnOriginalText; btn.disabled = false; }
+        if (res.code === 'pin') { redemanderPin(); return; }
         var err = document.getElementById('ouverture-error');
         if (err) {
           err.textContent = '✗ Échec de l\'enregistrement — ' + res.reason + ' Rien n\'a été sauvegardé, réessaie.';
