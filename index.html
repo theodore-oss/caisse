@@ -455,7 +455,11 @@
 </div>
 
 <script>
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlPFi6zfhU9-Bzj8Lz6KEdNdGskfEVntOE7XX8penAlzLjfYKMccv8X9YgtLxShnK18Q/exec';
+  // Backend : Cloudflare Worker (code dans cloudflare-worker/), partagé avec
+  // l'app de réconciliation et adossé au même Google Sheet. Remplace depuis le
+  // 04/08 le déploiement Apps Script, abandonné pour cause de lenteur et
+  // d'échecs intermittents (cf. le commentaire sur jsonpRequest plus bas).
+  var SCRIPT_URL = 'https://rosario-caisse-api.theodore-0c2.workers.dev';
   var PIN_AUTH   = 'rosario_pin_ok';
 
   // Le PIN validé est conservé pour la durée de l'onglet et renvoyé au
@@ -577,49 +581,39 @@
     // l'interface au bout de 6s plutôt que de laisser l'écran bloqué.
     setTimeout(clearGate, 6000);
 
-    // Récupérer espèces comptées via JSONP
-    window._onFondVeille = function(data) {
-      // Le test sur status est indispensable : sur une réponse d'erreur
-      // (ex. "Accès refusé" si le PIN mémorisé n'est plus valable), data.fond
-      // est undefined, ce qui passait les deux comparaisons ci-dessous et
+    // Dernières espèces comptées (indice affiché sous le champ)
+    jsonpRequest(SCRIPT_URL + '?t=' + Date.now() + pinParam(), 15000, function(res) {
+      // Le test sur le statut est indispensable : sur une réponse d'erreur
+      // (ex. PIN mémorisé plus valable), data.fond est undefined, ce qui
       // affichait "Dernières espèces comptées : NaN €".
-      if (!data || data.status !== 'ok') return;
-      var fond = parseFloat(data.fond);
+      if (!res.ok) return;
+      var fond = parseFloat(res.data.fond);
       if (isNaN(fond)) return;
       var hint = document.getElementById('hint-veille');
       if (hint) hint.textContent = 'Dernières espèces comptées : ' + fond.toFixed(2).replace('.',',') + ' €';
-    };
-    var s1 = document.createElement('script');
-    s1.src = SCRIPT_URL + '?callback=_onFondVeille&t=' + Date.now() + pinParam();
-    s1.onerror = function(){};
-    document.head.appendChild(s1);
+    });
 
-    // Récupérer ouverture en cours via JSONP
-    window._onOuvertureSheet = function(data) {
+    // Ouverture en cours (restauration du formulaire après rechargement)
+    jsonpRequest(SCRIPT_URL + '?action=get_ouverture&t=' + Date.now() + pinParam(), 15000, function(res) {
       clearGate();
-      // PIN mémorisé devenu invalide (code changé côté Apps Script depuis
-      // que cet onglet est ouvert) : on redemande le code plutôt que de
-      // laisser un formulaire vide dont aucun bouton ne fonctionnerait.
-      if (data && data.code === 'pin') { redemanderPin(); return; }
-      if (data && data.status === 'ok' && data.ouverture) {
-        var d = data.ouverture;
-        if (d.date)        document.getElementById('f-date').value        = d.date;
-        if (d.responsable) { pendingResponsableValue = d.responsable; applyPendingResponsable(); }
-        if (d.service)     document.getElementById('f-service').value     = d.service;
-        if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
-        calculate();
-        document.getElementById('btn-valider-ouv').style.display = 'none';
-        document.getElementById('bloc-cloture').style.display    = 'block';
-        document.getElementById('submit-final').style.display    = 'block';
-        restoreDraftIfMatching();
-      }
-      // Si data.ouverture est null : aucune ouverture en cours, on laisse
-      // le bloc d'ouverture (déjà visible par défaut) tel quel.
-    };
-    var s2 = document.createElement('script');
-    s2.src = SCRIPT_URL + '?action=get_ouverture&callback=_onOuvertureSheet&t=' + Date.now() + pinParam();
-    s2.onerror = function(){ clearGate(); };
-    document.head.appendChild(s2);
+      // PIN mémorisé devenu invalide (code changé côté serveur depuis que cet
+      // onglet est ouvert) : on redemande le code plutôt que de laisser un
+      // formulaire vide dont aucun bouton ne fonctionnerait.
+      if (!res.ok) { if (res.code === 'pin') redemanderPin(); return; }
+      var d = res.data.ouverture;
+      // ouverture null = aucune ouverture en cours : on laisse le bloc
+      // d'ouverture (déjà visible par défaut) tel quel.
+      if (!d) return;
+      if (d.date)        document.getElementById('f-date').value        = d.date;
+      if (d.responsable) { pendingResponsableValue = d.responsable; applyPendingResponsable(); }
+      if (d.service)     document.getElementById('f-service').value     = d.service;
+      if (d.fond_ouv)    document.getElementById('f-fond-ouv').value    = d.fond_ouv;
+      calculate();
+      document.getElementById('btn-valider-ouv').style.display = 'none';
+      document.getElementById('bloc-cloture').style.display    = 'block';
+      document.getElementById('submit-final').style.display    = 'block';
+      restoreDraftIfMatching();
+    });
 
     loadPersonnel();
   }
@@ -629,16 +623,16 @@
   var pendingResponsableValue = null; // valeur restaurée par _onOuvertureSheet, tant que get_personnel n'a pas encore répondu
 
   function loadPersonnel() {
-    var s = document.createElement('script');
-    s.src = SCRIPT_URL + '?action=get_personnel&callback=_onPersonnel&t=' + Date.now() + pinParam();
-    document.head.appendChild(s);
+    jsonpRequest(SCRIPT_URL + '?action=get_personnel&t=' + Date.now() + pinParam(), 15000, function(res) {
+      appliquerPersonnel(res.ok ? res.data.noms : null);
+    });
   }
-  window._onPersonnel = function(data) {
-    personnelNoms = (data && data.noms) || [];
+  function appliquerPersonnel(noms) {
+    personnelNoms = noms || [];
     renderPersonnelSelect();
     renderPersonnelPanel();
     applyPendingResponsable();
-  };
+  }
 
   function escapeHtml_(s) {
     return String(s).replace(/[&<>"']/g, function(c) {
@@ -882,39 +876,45 @@
   // écrite dans le Sheet (réseau, quota Apps Script, etc.) — trouvé le 11/07
   // en auditant le même type de bug déjà corrigé côté app de réconciliation
   // (validation de dépôt qui "revenait comme avant" au rechargement).
+  // Depuis la migration vers le Cloudflare Worker (04/08), c'est un simple
+  // fetch() : le backend renvoie de vrais en-têtes CORS, ce qu'Apps Script ne
+  // faisait pas — d'où le JSONP (injection de <script> + callback global) qui
+  // occupait cette place avant.
+  //
+  // Le nom "jsonpRequest" et la signature (url, timeoutMs, onDone) sont
+  // conservés pour ne pas toucher aux six appelants : la bascule tient en un
+  // seul endroit. Le nom est trompeur, mais un renommage global sur un
+  // formulaire utilisé quotidiennement par le staff serait un risque gratuit.
   function jsonpRequest(url, timeoutMs, onDone) {
-    var cbName = '_recon_cloture_cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
     var done = false;
-    var script = document.createElement('script');
+    // AbortController : sans lui, fetch() n'a pas de délai maximal — une
+    // requête qui n'aboutit jamais laisserait le bouton bloqué sur "Envoi en
+    // cours…" indéfiniment.
+    var ctrl = new AbortController();
     var timeoutId = setTimeout(function() {
       if (done) return;
       done = true;
-      delete window[cbName];
-      script.remove();
+      ctrl.abort();
       onDone({ ok: false, reason: 'pas de réponse du serveur après ' + Math.round(timeoutMs / 1000) + 's.' });
     }, timeoutMs);
-    window[cbName] = function(data) {
-      if (done) return;
-      done = true;
-      clearTimeout(timeoutId);
-      delete window[cbName];
-      script.remove();
-      if (data && data.status === 'ok') onDone({ ok: true, data: data });
-      // code : identifiant d'erreur stable renvoyé par le serveur (ex.
-      // 'doublon'), pour que l'appelant puisse réagir spécifiquement au lieu
-      // de devoir reconnaître un message en français.
-      else onDone({ ok: false, code: (data && data.code) || null, reason: (data && data.message) || 'réponse invalide du serveur.' });
-    };
-    script.onerror = function() {
-      if (done) return;
-      done = true;
-      clearTimeout(timeoutId);
-      delete window[cbName];
-      script.remove();
-      onDone({ ok: false, reason: 'échec réseau (vérifie ta connexion).' });
-    };
-    script.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'callback=' + cbName + '&t=' + Date.now();
-    document.head.appendChild(script);
+    fetch(url, { method: 'GET', signal: ctrl.signal, headers: { 'Accept': 'application/json' } })
+      .then(function(res) { return res.json().catch(function() { return null; }); })
+      .then(function(data) {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        if (data && data.status === 'ok') onDone({ ok: true, data: data });
+        // code : identifiant d'erreur stable renvoyé par le serveur (ex.
+        // 'doublon'), pour que l'appelant puisse réagir spécifiquement au lieu
+        // de devoir reconnaître un message en français.
+        else onDone({ ok: false, code: (data && data.code) || null, reason: (data && data.message) || 'réponse invalide du serveur.' });
+      })
+      .catch(function() {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        onDone({ ok: false, reason: 'échec réseau (vérifie ta connexion).' });
+      });
   }
 
   function submitForm(force) {
